@@ -446,3 +446,61 @@ None.
 
 ### Reviewer Notes
 Task 00.06 approved. Phase 00 closed (00.01–00.06). Next phase: Phase 01 — Database (Task 01.01 Organization Schema).
+
+---
+
+### TASK
+Date: 2026-09-25
+Phase: 00 — Foundation (follow-up)
+Task: Initial commit and GitHub push (CI activation)
+Agent: OpenCode
+Status: Completed
+
+### Requested Work
+Commit the Phase 00 foundation and push to GitHub.
+
+### Files Created
+None.
+
+### Files Modified
+- brain/AUDIT_LOG.md (this record)
+- brain/ASSUMPTIONS.md (ASM-008 resolution)
+
+### Files Deleted
+None.
+
+### Business Rules Verified
+No business code affected.
+
+### Tests
+- GitHub Actions run 36087189717 (live activation on push to main): backend, flutter-checks, flutter-windows-build.
+
+### Test Results
+All 3 jobs passed: Backend (format, lint, build, test) 22s; Flutter (Windows debug build) 4m31s; Flutter (format, analyze, test) 1m35s. Resolves the 00.05/ASM-008 live-CI limitation. Only warnings: actions Node 20 deprecation notices and upcoming ubuntu-latest runner migration (informational).
+
+### Security Review
+Public repo; .env templates only, no real secrets committed. gh token requires 'workflow' scope (present) for workflow file pushes.
+
+### Tenant Isolation Review
+Not applicable.
+
+### Offline/Sync Review
+Not applicable.
+
+### Database Review
+Not applicable.
+
+### Scope Review
+Commit + push only, plus audit-trail accuracy updates for the resolved CI assumption.
+
+### Assumptions
+ASM-008 marked resolved.
+
+### Unresolved Issues
+None new. Minor CI annotations: consider bumping checkout/setup-node to newer majors in a future task to silence Node 20 deprecation notice.
+
+### Architectural Changes
+None.
+
+### Reviewer Notes
+Repo: https://github.com/Anuragmagar/minimart-os (public, origin/main). Ready for Task 01.01.

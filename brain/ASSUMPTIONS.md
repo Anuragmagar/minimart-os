@@ -83,8 +83,8 @@ Task: 00.05 — CI Foundation
 Assumption: CI is implemented as a GitHub Actions workflow in .github/workflows/ci.yml.
 Reason: The repository tracks branch `main` and no CI provider is documented anywhere in /brain or /docs; GitHub Actions is the default for Flutter/NestJS monorepos and needs no external account beyond the (future) GitHub remote.
 Impact: When the repo is pushed to another CI provider, the workflow must be ported (a small config change). Live CI execution cannot be verified until a remote exists; commands were verified locally instead.
-Status: active
-Resolution:
+Status: resolved
+Resolution: 2026-09-25 — Initial commit pushed to https://github.com/Anuragmagar/minimart-os; CI run 36087189717 executed all three jobs green (Backend 22s, Flutter Windows build 4m31s, Flutter format/analyze/test 1m35s).
 
 ### ASM-009
 Date: 2026-09-25
