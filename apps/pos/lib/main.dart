@@ -1,9 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:window_manager/window_manager.dart';
 
 import 'src/app.dart';
 import 'src/di/injection.dart';
+import 'src/theme/theme_provider.dart';
 
-void main() {
-  configureDependencies();
-  runApp(const PosApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await windowManager.ensureInitialized();
+
+  WindowOptions windowOptions = const WindowOptions(
+    minimumSize: Size(1200, 800),
+    center: true,
+    backgroundColor: Colors.transparent,
+    skipTaskbar: false,
+    titleBarStyle: TitleBarStyle.normal,
+  );
+  windowManager.waitUntilReadyToShow(windowOptions, () async {
+    await windowManager.show();
+    await windowManager.focus();
+  });
+
+  final prefs = await SharedPreferences.getInstance();
+  configureDependencies(sharedPreferencesOverride: prefs);
+
+  final themeProvider = getIt<ThemeProvider>();
+  await themeProvider.initialize();
+
+  runApp(PosApp(themeProvider: themeProvider));
 }

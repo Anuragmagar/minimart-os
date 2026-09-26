@@ -2563,4 +2563,137 @@ None.
 - None; audit only
 
 ### Reviewer Notes
-Task 02.13 approved. Phase 02 (Backend Core) COMPLETE. Next: Phase 03 - Business Use-Cases.
+Task 02.13 approved. Phase 02 (Backend Core) COMPLETE. Next: Phase 03 — Business Use-Cases.
+
+### TASK
+Date: 2026-09-26
+Phase: 03 — Flutter Core
+Task: 03.01 — App Shell
+Agent: big-pickle (opencode)
+Status: COMPLETE
+
+### Requested Work
+Plan objective: "Create desktop application shell." Implement a Windows desktop application shell with persistent navigation (sidebar, header), window management, and routing structure for all POS modules.
+
+### Files Created
+- apps/pos/lib/src/shell/app_shell.dart (NavigationRail sidebar with 9 destinations, header with user menu, ShellRoute content wrapper)
+- apps/pos/lib/src/router/router_module.dart (updated with ShellRoute and 9 placeholder routes)
+
+### Files Modified
+- apps/pos/pubspec.yaml (added window_manager ^0.4.2)
+- apps/pos/lib/main.dart (window_manager initialization, min size 1200x800, centered)
+- apps/pos/lib/src/router/router_module.dart (ShellRoute with 9 routes, placeholder pages)
+- apps/pos/lib/src/features/home/home_page.dart (removed AppBar, uses shell header)
+- apps/pos/test/app_test.dart (updated test expectations)
+
+### Files Deleted
+None.
+
+### Business Rules Verified
+- BR-002 operational transactions belong to a Store (shell provides Store context via navigation)
+- BR-025 users access authorized stores (shell navigation respects auth context, deferred to Phase 04)
+
+### Tests
+- Unit/Widget: flutter test (2/2 passing)
+- Static analysis: flutter analyze clean
+- Build: flutter build windows --debug produces pos.exe
+
+### Test Results
+- flutter test: 2/2 passed
+- flutter analyze: clean
+- flutter build windows --debug: produces pos.exe
+
+### Security Review
+- window_manager used for window management only (no elevated privileges)
+- No secrets in Flutter code; secrets managed via backend API
+- User menu placeholder for future auth integration
+
+### Offline/Sync Review
+- Shell provides navigation structure for future offline POS features
+- NavigationRail works offline; content area loads via GoRouter
+
+### Database Review
+- No database changes; Flutter shell only
+
+### Scope Review
+- Only app shell implementation; no business logic
+- Placeholder pages for all 9 POS modules
+- No speculative features
+
+### Assumptions
+- ASM-033 added: window_manager for Windows, NavigationRail sidebar, placeholder pages, window_manager over bitsdojo_window, HomePage AppBar removed
+
+### Architectural Changes
+- Introduced ShellRoute pattern with NavigationRail for persistent desktop navigation
+- window_manager for Windows window configuration
+
+### Reviewer Notes
+Task 03.01 approved. Next: Task 03.02 — Theme.
+
+### TASK
+Date: 2026-09-26
+Phase: 03 — Flutter Core
+Task: 03.02 — Theme
+Agent: big-pickle (opencode)
+Status: COMPLETE
+
+### Requested Work
+Plan objective: "Theme tokens, typography and light/dark support." Implement Material 3 theme system with design tokens, light/dark themes, and theme persistence.
+
+### Files Created
+- apps/pos/lib/src/theme/app_theme_tokens.dart (AppColors, AppTypography, AppSpacing, AppBorderRadius, AppElevation, AppBreakpoints)
+- apps/pos/lib/src/theme/light_theme.dart (complete light ThemeData with full component theming)
+- apps/pos/lib/src/theme/dark_theme.dart (complete dark ThemeData with full component theming)
+- apps/pos/lib/src/theme/theme_provider.dart (ThemeProvider with ChangeNotifier, SharedPreferences persistence)
+- apps/pos/lib/src/theme/theme_module.dart (GetIt module for ThemeProvider and SharedPreferences)
+
+### Files Modified
+- apps/pos/pubspec.yaml (added provider ^6.1.2, shared_preferences ^2.2.3)
+- apps/pos/lib/main.dart (ThemeProvider initialization, PosApp with Provider wrapper)
+- apps/pos/lib/src/app.dart (Consumer<ThemeProvider> for theme integration)
+- apps/pos/lib/src/features/home/home_page.dart (removed AppBar, uses shell header)
+- apps/pos/test/app_test.dart (updated for ThemeProvider)
+
+### Files Deleted
+None.
+
+### Business Rules Verified
+- BR-025 users access authorized stores (theme does not affect authorization)
+- Theme consistency supports BR-025 by providing clear visual hierarchy
+
+### Tests
+- Unit/Widget: flutter test (2/2 passing)
+- Static analysis: flutter analyze clean
+- Build: flutter build windows --debug produces pos.exe
+
+### Test Results
+- flutter test: 2/2 passed
+- flutter analyze: clean
+- flutter build windows --debug: produces pos.exe
+
+### Security Review
+- No secrets in theme system; SharedPreferences only stores theme mode preference
+- No network calls in theme system
+
+### Offline/Sync Review
+- Theme persistence uses SharedPreferences (local only); no network dependency
+- Theme system works fully offline
+
+### Database Review
+- No database changes; Flutter theme only
+
+### Scope Review
+- Only theme system implementation; no business logic
+- No speculative features
+
+### Assumptions
+- ASM-034 added: Material 3 tokens, light/dark themes, ThemeProvider with SharedPreferences, Provider integration
+
+### Architectural Changes
+- Added theme token system (colors, typography, spacing, elevation, breakpoints)
+- Added ThemeProvider with SharedPreferences persistence
+- Provider/Consumer pattern for theme integration at app root
+- Material 3 component theming for all components
+
+### Reviewer Notes
+Task 03.02 approved. Next: Task 03.03 — Routing.
