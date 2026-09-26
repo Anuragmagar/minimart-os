@@ -1,19 +1,45 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
-import configuration from './config/configuration.js';
+import { AuthModule } from './auth/auth.module.js';
+import { GlobalExceptionFilter } from './common/filters/global-exception.filter.js';
+import { ResponseFormatInterceptor } from './common/interceptors/response-format.interceptor.js';
+import { createValidationPipe } from './common/validation/validation-pipe.js';
+import { AppConfigModule } from './config/app-config.module.js';
+import { AuditModule } from './audit/audit.module.js';
+import { DatabaseModule } from './database/database.module.js';
 import { HealthModule } from './health/health.module.js';
+import { IdempotencyModule } from './idempotency/idempotency.module.js';
+import { LoggingModule } from './logging/logging.module.js';
+import { OrganizationsModule } from './organizations/organizations.module.js';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      load: [configuration],
-    }),
+    AppConfigModule,
+    LoggingModule,
     HealthModule,
+    AuthModule,
+    DatabaseModule,
+    OrganizationsModule,
+    AuditModule,
+    IdempotencyModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_FILTER,
+      useClass: GlobalExceptionFilter,
+    },
+    {
+      provide: APP_PIPE,
+      useValue: createValidationPipe(),
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ResponseFormatInterceptor,
+    },
+  ],
 })
 export class AppModule {}

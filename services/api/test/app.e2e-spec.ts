@@ -1,8 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from './../src/app.module.js';
+import { configureApp } from './../src/configure-app.js';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
@@ -12,25 +14,33 @@ describe('AppController (e2e)', () => {
       imports: [AppModule],
     }).compile();
 
-    app = moduleFixture.createNestApplication();
+    app = configureApp(
+      moduleFixture.createNestApplication<NestExpressApplication>(),
+    );
     await app.init();
   });
 
-  it('/ (GET)', () => {
+  it('/api/v1 (GET)', () => {
     return request(app.getHttpServer())
-      .get('/')
+      .get('/api/v1')
       .expect(200)
-      .expect('Hello World!');
+      .expect(({ body }) => {
+        expect(body).toEqual({
+          data: 'Hello World!',
+          meta: {},
+        });
+      });
   });
 
-  it('/health (GET) reports ok', () => {
+  it('/api/v1/health (GET) reports ok', () => {
     return request(app.getHttpServer())
-      .get('/health')
+      .get('/api/v1/health')
       .expect(200)
       .expect((res) => {
-        expect(res.body.status).toBe('ok');
-        expect(res.body.service).toBe('minimart-api');
-        expect(typeof res.body.timestamp).toBe('string');
+        expect(res.body.data.status).toBe('ok');
+        expect(res.body.data.service).toBe('minimart-api');
+        expect(typeof res.body.data.timestamp).toBe('string');
+        expect(res.body.meta).toEqual({});
       });
   });
 
