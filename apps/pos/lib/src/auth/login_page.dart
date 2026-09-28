@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../di/injection.dart';
+import '../network/api_client.dart';
+import '../network/exceptions.dart';
 import 'auth_state.dart';
 
 class LoginPage extends StatefulWidget {
@@ -33,15 +35,38 @@ class _LoginPageState extends State<LoginPage> {
       _errorMessage = null;
     });
 
-    await Future.delayed(const Duration(milliseconds: 500));
+    try {
+      final apiClient = getIt<ApiClient>();
+      final response = await apiClient.login(
+        _emailController.text.trim(),
+        _passwordController.text,
+      );
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    final authState = getIt<AuthState>();
-    authState.setAuthenticated('mock-access-token', 'mock-refresh-token');
+      final authState = getIt<AuthState>();
+      authState.setAuthenticated(
+        response.accessToken,
+        response.refreshToken,
+      );
 
-    if (!mounted) return;
-    context.go('/pos');
+      if (!mounted) return;
+      context.go('/pos');
+    } on AppException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = e.message;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'An unexpected error occurred. Please try again.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override

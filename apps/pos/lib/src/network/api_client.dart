@@ -21,6 +21,16 @@ class ApiClient {
     ]);
   }
 
+  Future<LoginResponse> login(String email, String password) async {
+    final response = await _dio.post(
+      '/auth/login',
+      data: {'email': email, 'password': password},
+    );
+
+    final data = response.data['data'] as Map<String, dynamic>;
+    return LoginResponse.fromJson(data);
+  }
+
   Future<void> refreshToken() async {
     final refreshToken = _authState.refreshToken;
     if (refreshToken == null) {
@@ -48,6 +58,29 @@ class ApiClient {
       _authState.setUnauthenticated();
       rethrow;
     }
+  }
+}
+
+class LoginResponse {
+  final String accessToken;
+  final String refreshToken;
+  final int accessTokenExpiresIn;
+  final int refreshTokenExpiresIn;
+
+  LoginResponse({
+    required this.accessToken,
+    required this.refreshToken,
+    required this.accessTokenExpiresIn,
+    required this.refreshTokenExpiresIn,
+  });
+
+  factory LoginResponse.fromJson(Map<String, dynamic> json) {
+    return LoginResponse(
+      accessToken: json['accessToken'] as String,
+      refreshToken: json['refreshToken'] as String,
+      accessTokenExpiresIn: json['accessTokenExpiresIn'] as int,
+      refreshTokenExpiresIn: json['refreshTokenExpiresIn'] as int,
+    );
   }
 }
 
