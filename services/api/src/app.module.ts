@@ -14,6 +14,7 @@ import { IdempotencyModule } from './idempotency/idempotency.module.js';
 import { LoggingModule } from './logging/logging.module.js';
 import { OrganizationsModule } from './organizations/organizations.module.js';
 import { UsersModule } from './users/users.module.js';
+import { RolesModule } from './roles/roles.module.js';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { UsersModule } from './users/users.module.js';
     DatabaseModule,
     OrganizationsModule,
     UsersModule,
+    RolesModule,
     AuditModule,
     IdempotencyModule,
   ],
