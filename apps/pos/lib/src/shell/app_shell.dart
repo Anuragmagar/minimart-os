@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../auth/auth_state.dart';
 import '../di/injection.dart';
 
 class AppShell extends StatefulWidget {
@@ -184,9 +185,13 @@ class _UserMenu extends StatelessWidget {
           ),
         ),
       ],
-      onSelected: (value) {
+      onSelected: (value) async {
         if (value == 'logout') {
-          // TODO: Implement logout
+          final authState = getIt<AuthState>();
+          await authState.logout();
+          if (context.mounted) {
+            context.go('/login');
+          }
         }
       },
     );

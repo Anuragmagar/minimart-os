@@ -55,6 +55,25 @@ class ApiClient {
       rethrow;
     }
   }
+
+  Future<void> logout() async {
+    final refreshToken = _authState.refreshToken;
+    if (refreshToken == null) {
+      _authState.setUnauthenticated();
+      return;
+    }
+
+    try {
+      await _dio.post(
+        '/auth/logout',
+        data: {'refresh_token': refreshToken},
+      );
+    } catch (e) {
+      // Even if the server call fails, we should still log out locally
+    } finally {
+      _authState.setUnauthenticated();
+    }
+  }
 }
 
 class LoginResponse {

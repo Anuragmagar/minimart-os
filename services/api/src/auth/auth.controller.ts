@@ -5,6 +5,7 @@ import { LoginDto } from './dto/login.dto.js';
 import { LoginResponseDto } from './dto/login-response.dto.js';
 import { RefreshDto } from './dto/refresh.dto.js';
 import { RefreshResponseDto } from './dto/refresh-response.dto.js';
+import { LogoutDto } from './dto/logout.dto.js';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -28,5 +29,14 @@ export class AuthController {
   @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Invalid or expired refresh token' })
   async refresh(@Body() refreshDto: RefreshDto): Promise<RefreshResponseDto> {
     return this.authService.refresh(refreshDto.refreshToken);
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'User logout - revoke refresh token' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Logged out successfully' })
+  @ApiResponse({ status: HttpStatus.UNAUTHORIZED, description: 'Invalid refresh token' })
+  async logout(@Body() logoutDto: LogoutDto): Promise<{ message: string }> {
+    return this.authService.logout(logoutDto.refreshToken);
   }
 }

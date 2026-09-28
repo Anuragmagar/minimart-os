@@ -7,6 +7,7 @@ import { LoginDto } from './dto/login.dto.js';
 import { LoginResponseDto } from './dto/login-response.dto.js';
 import { RefreshDto } from './dto/refresh.dto.js';
 import { RefreshResponseDto } from './dto/refresh-response.dto.js';
+import { LogoutDto } from './dto/logout.dto.js';
 
 @Injectable()
 export class AuthService {
@@ -156,5 +157,25 @@ export class AuthService {
       accessTokenExpiresIn: 900,
       refreshTokenExpiresIn: 604800,
     };
+  }
+
+  async logout(refreshToken: string): Promise<{ message: string }> {
+    const tokenHash = this.hashToken(refreshToken);
+
+    const storedToken = await this.prisma.client.refreshToken.findUnique({
+      where: { tokenHash },
+    });
+
+    if (!storedToken) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    // Revoke the token
+    await this.prisma.client.refreshToken.update({
+      where: { id: storedToken.id },
+      data: { revoked: true },
+    });
+
+    return { message: 'Logged out successfully' };
   }
 }
