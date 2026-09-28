@@ -25,8 +25,7 @@ void main() async {
   final prefs = await SharedPreferences.getInstance();
   configureDependencies(sharedPreferencesOverride: prefs);
 
-  final themeProvider = getIt<ThemeProvider>();
-  await themeProvider.initialize();
+  final themeProvider = await getIt.getAsync<ThemeProvider>();
 
   runApp(PosApp(themeProvider: themeProvider));
 }
