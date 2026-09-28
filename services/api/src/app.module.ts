@@ -13,6 +13,7 @@ import { HealthModule } from './health/health.module.js';
 import { IdempotencyModule } from './idempotency/idempotency.module.js';
 import { LoggingModule } from './logging/logging.module.js';
 import { OrganizationsModule } from './organizations/organizations.module.js';
+import { UsersModule } from './users/users.module.js';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { OrganizationsModule } from './organizations/organizations.module.js';
     AuthModule,
     DatabaseModule,
     OrganizationsModule,
+    UsersModule,
     AuditModule,
     IdempotencyModule,
   ],
