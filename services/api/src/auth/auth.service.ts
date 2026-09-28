@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../database/prisma.service.js';
 import { PasswordService } from './password.service.js';
 import { JwtService } from './jwt.service.js';
+import * as crypto from 'crypto';
 import { LoginDto } from './dto/login.dto.js';
 import { LoginResponseDto } from './dto/login-response.dto.js';
 import { RefreshDto } from './dto/refresh.dto.js';
@@ -62,6 +63,18 @@ export class AuthService {
       orgId,
     });
 
+    // Store refresh token hash in database for rotation
+    const tokenHash = this.hashToken(refreshToken);
+    const expiresAt = new Date(Date.now() + 604800 * 1000); // 7 days
+    await this.prisma.client.refreshToken.create({
+      data: {
+        userId: user.id,
+        organizationId: user.organizationId,
+        tokenHash,
+        expiresAt,
+      },
+    });
+
     return {
       accessToken,
       refreshToken,
@@ -70,9 +83,30 @@ export class AuthService {
     };
   }
 
+  private hashToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
+  }
+
   async refresh(refreshToken: string): Promise<RefreshResponseDto> {
     const payload = await this.jwtService.verifyRefreshToken(refreshToken);
     if (!payload) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    // Hash the incoming refresh token to look it up
+    const tokenHash = this.hashToken(refreshToken);
+
+    // Find the refresh token in database
+    const storedToken = await this.prisma.client.refreshToken.findUnique({
+      where: { tokenHash },
+    });
+
+    if (!storedToken) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    // Check if token is revoked or expired
+    if (storedToken.revoked || storedToken.expiresAt < new Date()) {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
@@ -83,6 +117,12 @@ export class AuthService {
     if (!user || user.status !== 'active') {
       throw new UnauthorizedException('User not found or deactivated');
     }
+
+    // Revoke the old refresh token (rotation)
+    await this.prisma.client.refreshToken.update({
+      where: { id: storedToken.id },
+      data: { revoked: true },
+    });
 
     const orgId = user.organizationId;
     let storeId: string | undefined;
@@ -96,6 +136,18 @@ export class AuthService {
     const newRefreshToken = await this.jwtService.generateRefreshToken({
       sub: user.id,
       orgId,
+    });
+
+    // Store new refresh token hash
+    const newTokenHash = this.hashToken(newRefreshToken);
+    const expiresAt = new Date(Date.now() + 604800 * 1000); // 7 days
+    await this.prisma.client.refreshToken.create({
+      data: {
+        userId: user.id,
+        organizationId: user.organizationId,
+        tokenHash: newTokenHash,
+        expiresAt,
+      },
     });
 
     return {

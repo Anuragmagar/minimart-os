@@ -1170,23 +1170,42 @@ model Conflict {
   @@map("conflicts")
 }
 
+
+model RefreshToken {
+    id             String   @id @default(uuid()) @db.Uuid
+    userId         String   @map("user_id") @db.Uuid
+    organizationId String   @map("organization_id") @db.Uuid
+    tokenHash      String   @map("token_hash")
+    revoked        Boolean  @default(false) @map("revoked")
+    expiresAt      DateTime @map("expires_at") @db.Timestamptz(6)
+
+    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+    @@unique([tokenHash])
+    @@index([userId])
+    @@index([organizationId])
+    @@index([expiresAt])
+    @@map("refresh_tokens")
+  }
+
 model IdempotencyRecord {
-  id             String   @id @default(uuid()) @db.Uuid
-  organizationId String   @map("organization_id") @db.Uuid
-  storeId        String?  @map("store_id") @db.Uuid
-  userId         String?  @map("user_id") @db.Uuid
-  operationKey   String   @map("operation_key")
-  requestHash    String   @map("request_hash")
-  status         String   @default("IN_PROGRESS")
-  responseStatus Int?     @map("response_status")
-  responseBody   Json?    @map("response_body")
-  expiresAt      DateTime @map("expires_at") @db.Timestamptz(6)
+    id             String   @id @default(uuid()) @db.Uuid
+    organizationId String   @map("organization_id") @db.Uuid
+    storeId        String?  @map("store_id") @db.Uuid
+    userId         String?  @map("user_id") @db.Uuid
+    operationKey   String   @map("operation_key")
+    requestHash    String   @map("request_hash")
+    status         String   @default("IN_PROGRESS")
+    responseStatus Int?     @map("response_status")
+    responseBody   Json?    @map("response_body")
+    expiresAt      DateTime @map("expires_at") @db.Timestamptz(6)
 
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  @@unique([organizationId, operationKey])
-  @@index([organizationId, expiresAt])
-  @@index([operationKey, createdAt])
-  @@map("idempotency_records")
-}
+    @@unique([organizationId, operationKey])
+    @@index([organizationId, expiresAt])
+    @@index([operationKey, createdAt])
+    @@map("idempotency_records")
+  }
