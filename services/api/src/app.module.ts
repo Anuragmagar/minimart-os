@@ -16,6 +16,7 @@ import { OrganizationsModule } from './organizations/organizations.module.js';
 import { UsersModule } from './users/users.module.js';
 import { RolesModule } from './roles/roles.module.js';
 import { PermissionsModule } from './permissions/permissions.module.js';
+import { StoresModule } from './stores/stores.module.js';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { PermissionsModule } from './permissions/permissions.module.js';
     UsersModule,
     RolesModule,
     PermissionsModule,
+    StoresModule,
     AuditModule,
     IdempotencyModule,
   ],
