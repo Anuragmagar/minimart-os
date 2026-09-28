@@ -16,6 +16,7 @@ class ApiClient {
   void _setupInterceptors() {
     _dio.interceptors.addAll([
       _AuthInterceptor(_authState),
+      _RefreshInterceptor(_dio, _authState),
       _ErrorInterceptor(),
       _LoggingInterceptor(),
     ]);
@@ -41,19 +42,14 @@ class ApiClient {
       final response = await _dio.post(
         '/auth/refresh',
         data: {'refresh_token': refreshToken},
-        options: Options(headers: {'Authorization': 'Bearer $refreshToken'}),
       );
 
-      final accessToken = response.data['data']?['access_token'] as String?;
-      final newRefreshToken =
-          response.data['data']?['refresh_token'] as String?;
+      final data = response.data['data'] as Map<String, dynamic>;
+      final accessToken = data['accessToken'] as String;
+      final newRefreshToken = data['refreshToken'] as String;
 
-      if (accessToken != null) {
-        _authState.updateAccessToken(accessToken);
-        if (newRefreshToken != null) {
-          _authState.setAuthenticated(accessToken, newRefreshToken);
-        }
-      }
+      _authState.updateAccessToken(accessToken);
+      _authState.setAuthenticated(accessToken, newRefreshToken);
     } catch (e) {
       _authState.setUnauthenticated();
       rethrow;
@@ -99,6 +95,69 @@ class _AuthInterceptor extends Interceptor {
   }
 }
 
+class _RefreshInterceptor extends Interceptor {
+  final Dio _dio;
+  final AuthState _authState;
+
+  _RefreshInterceptor(this._dio, this._authState);
+
+  bool _isRefreshing = false;
+  final List<Function> _waitingRequests = [];
+
+  @override
+  void onError(DioException err, ErrorInterceptorHandler handler) {
+    if (err.response?.statusCode == 401 && !_isRefreshing) {
+      _retryWithRefresh(err, handler);
+    } else {
+      handler.next(err);
+    }
+  }
+
+  Future<void> _retryWithRefresh(DioException err, ErrorInterceptorHandler handler) async {
+    _isRefreshing = true;
+    try {
+      final refreshToken = _authState.refreshToken;
+      if (refreshToken == null) {
+        _authState.setUnauthenticated();
+        handler.next(err);
+        return;
+      }
+
+      final response = await _dio.post(
+        '/auth/refresh',
+        data: {'refresh_token': refreshToken},
+      );
+
+      final data = response.data['data'] as Map<String, dynamic>;
+      final accessToken = data['accessToken'] as String;
+      final newRefreshToken = data['refreshToken'] as String;
+
+      _authState.updateAccessToken(accessToken);
+      _authState.setAuthenticated(accessToken, newRefreshToken);
+
+      _isRefreshing = false;
+      for (final callback in _waitingRequests) {
+        callback();
+      }
+      _waitingRequests.clear();
+
+      // Retry the original request
+      final options = err.requestOptions;
+      options.headers['Authorization'] = 'Bearer ${_authState.accessToken}';
+      final retryResponse = await _dio.fetch(options);
+      handler.resolve(retryResponse);
+    } catch (e) {
+      _isRefreshing = false;
+      _authState.setUnauthenticated();
+      for (final callback in _waitingRequests) {
+        callback();
+      }
+      _waitingRequests.clear();
+      handler.next(err);
+    }
+  }
+}
+
 class _ErrorInterceptor extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) {
@@ -106,15 +165,9 @@ class _ErrorInterceptor extends Interceptor {
       final statusCode = err.response!.statusCode;
       final data = err.response!.data;
 
+      // Don't handle 401 here - let _RefreshInterceptor handle it
       if (statusCode == 401) {
-        handler.reject(
-          DioException(
-            requestOptions: err.requestOptions,
-            response: err.response,
-            type: DioExceptionType.badResponse,
-            error: const AuthException(message: 'Unauthorized'),
-          ),
-        );
+        handler.next(err);
         return;
       }
 

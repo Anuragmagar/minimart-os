@@ -4,6 +4,8 @@ import { PasswordService } from './password.service.js';
 import { JwtService } from './jwt.service.js';
 import { LoginDto } from './dto/login.dto.js';
 import { LoginResponseDto } from './dto/login-response.dto.js';
+import { RefreshDto } from './dto/refresh.dto.js';
+import { RefreshResponseDto } from './dto/refresh-response.dto.js';
 
 @Injectable()
 export class AuthService {
@@ -65,6 +67,42 @@ export class AuthService {
       refreshToken,
       accessTokenExpiresIn: 900, // 15 minutes
       refreshTokenExpiresIn: 604800, // 7 days
+    };
+  }
+
+  async refresh(refreshToken: string): Promise<RefreshResponseDto> {
+    const payload = await this.jwtService.verifyRefreshToken(refreshToken);
+    if (!payload) {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+
+    const user = await this.prisma.client.user.findUnique({
+      where: { id: payload.sub },
+    });
+
+    if (!user || user.status !== 'active') {
+      throw new UnauthorizedException('User not found or deactivated');
+    }
+
+    const orgId = user.organizationId;
+    let storeId: string | undefined;
+
+    const accessToken = await this.jwtService.generateAccessToken({
+      sub: user.id,
+      orgId,
+      storeId,
+    });
+
+    const newRefreshToken = await this.jwtService.generateRefreshToken({
+      sub: user.id,
+      orgId,
+    });
+
+    return {
+      accessToken,
+      refreshToken: newRefreshToken,
+      accessTokenExpiresIn: 900,
+      refreshTokenExpiresIn: 604800,
     };
   }
 }
