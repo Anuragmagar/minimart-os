@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'src/app.dart';
+import 'src/auth/auth_state.dart';
 import 'src/di/injection.dart';
 import 'src/theme/theme_provider.dart';
 
@@ -26,6 +27,8 @@ void main() async {
   configureDependencies(sharedPreferencesOverride: prefs);
 
   final themeProvider = await getIt.getAsync<ThemeProvider>();
+  final authState = getIt.get<AuthState>();
+  await authState.initialize();
 
   runApp(PosApp(themeProvider: themeProvider));
 }

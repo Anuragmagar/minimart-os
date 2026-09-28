@@ -45,9 +45,12 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
 
       final authState = getIt<AuthState>();
-      authState.setAuthenticated(
+      final now = DateTime.now();
+      await authState.setAuthenticated(
         response.accessToken,
         response.refreshToken,
+        now.add(Duration(seconds: response.accessTokenExpiresIn)),
+        now.add(Duration(seconds: response.refreshTokenExpiresIn)),
       );
 
       if (!mounted) return;

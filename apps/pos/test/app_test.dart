@@ -47,7 +47,12 @@ void main() {
     await themeProvider.initialize();
 
     final authState = getIt<AuthState>();
-    authState.setAuthenticated('mock-access-token', 'mock-refresh-token');
+    await authState.setAuthenticated(
+      'mock-access-token',
+      'mock-refresh-token',
+      DateTime.now().add(const Duration(minutes: 15)),
+      DateTime.now().add(const Duration(days: 7)),
+    );
 
     await tester.pumpWidget(
       ChangeNotifierProvider<ThemeProvider>.value(

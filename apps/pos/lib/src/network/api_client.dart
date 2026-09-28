@@ -47,9 +47,16 @@ class ApiClient {
       final data = response.data['data'] as Map<String, dynamic>;
       final accessToken = data['accessToken'] as String;
       final newRefreshToken = data['refreshToken'] as String;
+      final accessTokenExpiresIn = data['accessTokenExpiresIn'] as int? ?? 900;
+      final refreshTokenExpiresIn = data['refreshTokenExpiresIn'] as int? ?? 604800;
 
-      _authState.updateAccessToken(accessToken);
-      _authState.setAuthenticated(accessToken, newRefreshToken);
+      final now = DateTime.now();
+      await _authState.setAuthenticated(
+        accessToken,
+        newRefreshToken,
+        DateTime.now().add(Duration(seconds: accessTokenExpiresIn)),
+        DateTime.now().add(Duration(seconds: refreshTokenExpiresIn)),
+      );
     } catch (e) {
       _authState.setUnauthenticated();
       rethrow;
@@ -150,9 +157,15 @@ class _RefreshInterceptor extends Interceptor {
       final data = response.data['data'] as Map<String, dynamic>;
       final accessToken = data['accessToken'] as String;
       final newRefreshToken = data['refreshToken'] as String;
+      final accessTokenExpiresIn = data['accessTokenExpiresIn'] as int? ?? 900;
+      final refreshTokenExpiresIn = data['refreshTokenExpiresIn'] as int? ?? 604800;
 
-      _authState.updateAccessToken(accessToken);
-      _authState.setAuthenticated(accessToken, newRefreshToken);
+      await _authState.setAuthenticated(
+        accessToken,
+        newRefreshToken,
+        DateTime.now().add(Duration(seconds: accessTokenExpiresIn)),
+        DateTime.now().add(Duration(seconds: refreshTokenExpiresIn)),
+      );
 
       _isRefreshing = false;
       for (final callback in _waitingRequests) {
