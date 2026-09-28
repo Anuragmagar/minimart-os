@@ -15,6 +15,7 @@ import { LoggingModule } from './logging/logging.module.js';
 import { OrganizationsModule } from './organizations/organizations.module.js';
 import { UsersModule } from './users/users.module.js';
 import { RolesModule } from './roles/roles.module.js';
+import { PermissionsModule } from './permissions/permissions.module.js';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { RolesModule } from './roles/roles.module.js';
     OrganizationsModule,
     UsersModule,
     RolesModule,
+    PermissionsModule,
     AuditModule,
     IdempotencyModule,
   ],
