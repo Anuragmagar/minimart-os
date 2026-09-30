@@ -8,6 +8,7 @@ Short-lived access token + rotating refresh token. Sessions must be revocable.
 
 ## Permissions
 Examples:
+products:manage
 products:create
 products:update
 products:deactivate

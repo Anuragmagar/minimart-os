@@ -150,12 +150,12 @@ describe('Development seed data', () => {
   });
 
   it('catalogues the permissions documented in brain/SECURITY.md', async () => {
-    expect(DEV_PERMISSION_CODES).toHaveLength(20);
+    expect(DEV_PERMISSION_CODES).toHaveLength(21);
     const rows = await prisma.permission.findMany({
       orderBy: { code: 'asc' },
       where: { code: { in: DEV_PERMISSION_CODES } },
     });
-    expect(rows).toHaveLength(20);
+    expect(rows).toHaveLength(21);
 
     const owner = await prisma.role.findUnique({
       where: {
@@ -163,7 +163,7 @@ describe('Development seed data', () => {
       },
       include: { permissions: { include: { permission: true } } },
     });
-    expect(owner?.permissions).toHaveLength(20);
+    expect(owner?.permissions).toHaveLength(21);
 
     const cashier = await prisma.role.findUnique({
       where: {
@@ -306,7 +306,7 @@ describe('Development seed data', () => {
     expect(orgs).toBe(1);
     expect(users).toBe(3);
     expect(roles).toBe(3);
-    expect(perms).toBe(20);
+    expect(perms).toBe(21);
     expect(cats).toBe(6);
     expect(prods).toBe(12);
     expect(prices).toBe(12);

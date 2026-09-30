@@ -455,3 +455,16 @@ Impact: Readability of the audit history and state document is degraded. Content
 Status: open - needs a dedicated repair task with a per-file codepage analysis and a diff review
 
 Resolution:
+
+## ASM-047
+
+Task: 05.01 - Category Hierarchy
+Assumption: The category tree has no enforced maximum depth. Cycle prevention is the only structural constraint applied to `categories.parentId`.
+
+Reason: The task was put to the user as an explicit decision rather than being invented. The alternatives considered were a depth limit versus none. The user chose no maximum depth, so hierarchy validation consists of same-organization parent checks, self-parent prevention, and ancestor-walk cycle detection. No business document defines a maximum depth, so imposing one would have invented a rule (AGENTS.md section 5).
+
+Impact: A category chain of unbounded length is representable. The ancestor walk in `CategoryService` is iterative rather than recursive, so a deep chain costs database round trips proportional to depth and cannot blow the Node call stack. Deep trees will be slow to validate rather than incorrect. If product nesting later needs a practical ceiling, this assumption must be revisited and a limit added to the service together with a documented rule.
+
+Status: open - revisit if a maximum category depth is ever required
+
+Resolution:

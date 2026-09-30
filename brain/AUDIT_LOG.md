@@ -3719,3 +3719,78 @@ Task 04.12 per `plans/04_AUTH_RBAC.md`, if defined; otherwise the High findings 
 ---
 Audit performed by: Senior Software Engineer / Security Review
 Date: 2026-09-29
+
+---
+
+# Task 05.01 - Category Hierarchy
+
+Date: 2026-09-30
+Audit performed by: Senior Software Engineer / Feature Review
+
+## Summary
+
+Implemented the organization-scoped category tree on top of the existing `Category` model. The Prisma model, its `@@unique([organizationId, name])` constraint, and its self-referencing `parentId` foreign key already existed from Phase 01 task 01.04, so no migration was required and no schema change was made.
+
+A new `products:manage` permission code was introduced to gate category reads and writes. Because a permission code is a business-rule change under AGENTS.md, it was added to `brain/SECURITY.md`, `src/auth/permission-codes.ts`, the `PERMISSION` alias map, and the `ROLE_PERMISSIONS` map in `prisma/seed.ts` in the same reviewed change. The manager seed role receives it; the owner role receives the whole catalog.
+
+## Business Rules Verified
+
+- A category belongs to exactly one organization, taken from the authenticated principal. A caller-supplied `organizationId` in a payload is stripped by the validation pipe and never reaches the service.
+- A parent must exist in the same organization. A cross-organization or unknown parent is rejected with a 400 before any write.
+- A category cannot be its own parent.
+- A re-parent is refused if the proposed parent is the category itself or any of its descendants. Detection walks the ancestor chain iteratively from the proposed parent and fails on a repeat. No maximum depth is enforced; that was an explicit user decision, recorded as ASM-047.
+- `parentId: null` explicitly moves a category to the root. Omitting `parentId` leaves the parent untouched, so a rename cannot accidentally detach a subtree.
+- Category names are unique per organization, enforced by the existing database constraint. The service pre-checks and returns 409, and the database constraint remains the authority if two requests race.
+- Hard delete is refused while any product or subcategory references the row. `deactivate` is the soft path and sets the row inactive without touching children.
+- Cross-organization access by id returns not-found rather than forbidden, so a caller cannot probe another tenant's data.
+
+## Decisions Requiring the Database, Not the Service
+
+Two DB tests deliberately assert that the database would accept invalid data, to document that the service-level checks are load-bearing rather than redundant:
+
+1. `categories_parent_id_fkey` does not compare organizations, so PostgreSQL will happily store a child in organization A pointing at a parent in organization B. The service rejects it.
+2. The self-referencing foreign key carries no cycle detection, so PostgreSQL will happily store a two-node loop. Without the service check the hierarchy would not be a tree.
+
+## Transactions
+
+`create`, `update`, and `deactivate` each run inside `PrismaService.runInTransaction`, with the audit record written through the same transaction handle. A DB test forces the audit write to reject and asserts the category row is absent afterwards, proving the business write rolls back with the audit write rather than committing without it.
+
+## Tests Run
+
+- Unit: 119 passing, up from 82. 37 new category tests covering tenancy, hierarchy validation, audit payloads, and delete guards.
+- E2E: 45 passing, up from 24. 21 new tests in `test/categories.e2e-spec.ts` covering the full guard chain, permission denial, tenant isolation, validation, and the response envelope.
+- DB integration: 274 passing, up from 254. 20 new tests in `test/db/category-hierarchy.schema.spec.ts` against real PostgreSQL.
+- Build, oxlint (0 warnings), and prettier all clean.
+
+### Test defects found and fixed during this task
+
+- The new e2e suite declared `PrismaService` and `AuditService` as providers on its own probe module. Because `CategoriesModule` resolves its own instances, those declarations were ignored and the suite silently executed against the live development database. It was changed to `overrideProvider`, which is what actually replaces a provider in an already-imported module. The development database was checked afterwards and still held exactly the six seeded categories, confirming nothing leaked.
+- Three hardcoded permission counts in `test/db/seed.schema.spec.ts` were stale at 20 after the catalog grew to 21. Corrected to 21.
+
+## Security
+
+- Category routes are deny-by-default: `AuthGuard`, `PermissionsGuard` requiring `products:manage`, and `TenantScopeGuard` run application-wide, and every route carries `@RequireTenantScope()`.
+- Repository queries are organization-scoped at the query level, so a missing `where.organizationId` would return nothing rather than another tenant's rows. Unit tests assert the organization is always part of the query.
+- The organization is never read from the request body, query, or path.
+- The sort column is resolved through an allow-list and falls back to a default, so a caller cannot sort by an arbitrary column.
+- No secret, password, or token is logged. Audit before/after payloads go through the existing `sanitizeForAudit`.
+
+## Offline / Sync
+
+Not touched. This task is server-side only. The Flutter local category table and the offline category data sync belong to later Phase 05 tasks, and this task makes no claim about them.
+
+## Assumptions
+
+ASM-047 (no maximum category depth, explicit user decision). No other assumption was taken. Category name length, character set, and whether a category may be deactivated while children are active are not defined by any brain document and were not invented; the implementation applies the same generic string validation already used elsewhere in the codebase and leaves the deeper rules to a later product task.
+
+## Unresolved Issues
+
+None blocking. Two follow-ups are worth raising before the product tasks rely on this: the reference counts that guard delete are read outside the delete transaction, so a concurrent insert could still win the race and surface as a database foreign-key error rather than a clean 400; and a deactivated category with active children is currently permitted, which may or may not be the intended business rule.
+
+## Architectural Changes
+
+None. The layering is unchanged: controller, service, repository, Prisma. `CategoriesModule` follows the same shape as the users and roles modules and is registered in `AppModule`. No schema migration, no new dependency.
+
+## Next Available Task
+
+Task 05.02 per `plans/05_PRODUCTS.md`.

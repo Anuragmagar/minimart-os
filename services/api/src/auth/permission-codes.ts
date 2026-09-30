@@ -6,6 +6,7 @@
  * same reviewed change. Guards may only require codes that appear here.
  */
 export const PERMISSION_CODES = [
+  'products:manage',
   'products:create',
   'products:update',
   'products:deactivate',
@@ -35,6 +36,7 @@ export type PermissionCode = (typeof PERMISSION_CODES)[number];
  * a hand-typed permission string that could drift from the catalog.
  */
 export const PERMISSION = {
+  productsManage: 'products:manage',
   usersManage: 'users:manage',
   rolesManage: 'roles:manage',
 } as const satisfies Record<string, PermissionCode>;

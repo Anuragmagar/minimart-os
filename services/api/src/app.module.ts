@@ -17,6 +17,7 @@ import { UsersModule } from './users/users.module.js';
 import { RolesModule } from './roles/roles.module.js';
 import { PermissionsModule } from './permissions/permissions.module.js';
 import { StoresModule } from './stores/stores.module.js';
+import { CategoriesModule } from './categories/categories.module.js';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { StoresModule } from './stores/stores.module.js';
     RolesModule,
     PermissionsModule,
     StoresModule,
+    CategoriesModule,
     AuditModule,
     IdempotencyModule,
   ],

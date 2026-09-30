@@ -33,6 +33,7 @@ export const DEV_PERMISSION_CODES: readonly string[] = PERMISSION_CODES;
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   owner: DEV_PERMISSION_CODES,
   manager: [
+    'products:manage',
     'products:create',
     'products:update',
     'products:deactivate',
