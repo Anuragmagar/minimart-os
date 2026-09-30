@@ -4,28 +4,65 @@ import { PrismaService, type PrismaTx } from '../database/prisma.service.js';
 import { UserRepository } from './user.repository.js';
 import type { UserQueryDto } from './dto/user-query.dto.js';
 import type { PaginatedResponseDto } from './dto/paginated-response.dto.js';
+import type { User } from '../generated/prisma/client.js';
+
+const SORTABLE_COLUMNS = new Set([
+  'createdAt',
+  'updatedAt',
+  'name',
+  'email',
+  'status',
+  'lastLogin',
+]);
+
+/**
+ * Rejects a client-chosen sort column that is not in the allow-list. Without
+ * this, `sortBy` is an attacker-controlled key handed to Prisma.
+ */
+function resolveOrderBy(query: UserQueryDto): Record<string, 'asc' | 'desc'> {
+  const column =
+    query.sortBy && SORTABLE_COLUMNS.has(query.sortBy)
+      ? query.sortBy
+      : 'createdAt';
+  return { [column]: query.sortOrder ?? 'desc' };
+}
 
 @Injectable()
-export class PrismaUserRepository extends BaseRepository implements UserRepository {
+export class PrismaUserRepository
+  extends BaseRepository
+  implements UserRepository
+{
   constructor(prisma: PrismaService) {
     super(prisma);
   }
 
-  async findById(id: string, tx?: PrismaTx): Promise<any | null> {
-    return this.clientOrTx(tx).user.findUnique({ where: { id } });
+  async findByIdInOrganization(
+    id: string,
+    organizationId: string,
+    tx?: PrismaTx,
+  ): Promise<User | null> {
+    return this.clientOrTx(tx).user.findFirst({
+      where: { id, organizationId },
+    });
   }
 
-  async findByEmail(email: string, tx?: PrismaTx): Promise<any | null> {
+  async findByEmail(email: string, tx?: PrismaTx): Promise<User | null> {
     return this.clientOrTx(tx).user.findUnique({ where: { email } });
   }
 
-  async findAll(query: UserQueryDto, tx?: PrismaTx): Promise<any> {
+  async findAllInOrganization(
+    query: UserQueryDto,
+    organizationId: string,
+    tx?: PrismaTx,
+  ): Promise<PaginatedResponseDto<User>> {
     const client = this.clientOrTx(tx);
-    const page = query.page || 1;
-    const limit = query.limit || 20;
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    // organizationId is part of the same where clause as every other filter, so
+    // it cannot be dropped by a caller-supplied filter.
+    const where: Record<string, unknown> = { organizationId };
 
     if (query.search) {
       where.OR = [
@@ -35,37 +72,31 @@ export class PrismaUserRepository extends BaseRepository implements UserReposito
     }
 
     if (query.roleId) {
-      where.roles = {
-        some: { roleId: query.roleId },
-      };
+      where.roles = { some: { roleId: query.roleId } };
     }
 
     if (query.storeId) {
-      where.storeAccess = {
-        some: { storeId: query.storeId },
-      };
+      where.storeAccess = { some: { storeId: query.storeId } };
     }
 
     if (query.status) {
       where.status = query.status;
     }
 
+    const orderBy = resolveOrderBy(query);
+
     const [data, total] = await Promise.all([
-      this.clientOrTx(tx).user.findMany({
+      client.user.findMany({
         where,
         skip,
         take: limit,
-        orderBy: { [query.sortBy || 'createdAt']: query.sortOrder || 'desc' },
+        orderBy,
         include: {
-          roles: {
-            include: { role: true },
-          },
-          storeAccess: {
-            include: { store: true },
-          },
+          roles: { include: { role: true } },
+          storeAccess: { include: { store: true } },
         },
       }),
-      this.clientOrTx(tx).user.count({ where }),
+      client.user.count({ where }),
     ]);
 
     return {
@@ -74,18 +105,20 @@ export class PrismaUserRepository extends BaseRepository implements UserReposito
       limit,
       total,
       totalPages: Math.ceil(total / limit),
-    };
+    } as PaginatedResponseDto<User>;
   }
 
-  async create(data: any, tx?: PrismaTx): Promise<any> {
-    return this.clientOrTx(tx).user.create({ data });
+  async create(data: unknown, tx?: PrismaTx): Promise<User> {
+    return this.clientOrTx(tx).user.create({
+      data: data as never,
+    }) as Promise<User>;
   }
 
-  async update(id: string, data: any, tx?: PrismaTx): Promise<any> {
+  async update(id: string, data: unknown, tx?: PrismaTx): Promise<User> {
     return this.clientOrTx(tx).user.update({
       where: { id },
-      data,
-    });
+      data: data as never,
+    }) as Promise<User>;
   }
 
   async delete(id: string, tx?: PrismaTx): Promise<void> {

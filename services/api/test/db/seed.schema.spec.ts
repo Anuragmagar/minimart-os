@@ -217,10 +217,9 @@ describe('Development seed data', () => {
     const admin = await prisma.user.findUnique({
       where: { email: 'admin@minimart.local' },
     });
-    expect(admin?.passwordHash).toMatch(/^scrypt:/);
-    const key = admin?.passwordHash.split(':');
-    expect(key?.length).toBe(6);
-    expect(key?.[1]).toBe('16384');
+    // The seed must use the same algorithm as PasswordService, so a seeded
+    // credential can actually authenticate and the two can never drift apart.
+    expect(admin?.passwordHash).toMatch(/^\$argon2id\$/);
     expect(admin?.passwordHash).not.toContain('MinimartDev@123');
 
     const store = await prisma.store.findUnique({

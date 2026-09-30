@@ -1,4 +1,11 @@
-import { IsEmail, IsString, MinLength, IsOptional, IsUUID, IsEnum } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  MinLength,
+  IsOptional,
+  IsUUID,
+  IsEnum,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateUserDto {
@@ -18,12 +25,18 @@ export class UpdateUserDto {
   @IsString()
   phone?: string;
 
-  @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000', required: false })
+  @ApiProperty({
+    example: '123e4567-e89b-12d3-a456-426614174000',
+    required: false,
+  })
   @IsOptional()
   @IsUUID()
   roleId?: string;
 
-  @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174001', required: false })
+  @ApiProperty({
+    example: '123e4567-e89b-12d3-a456-426614174001',
+    required: false,
+  })
   @IsOptional()
   @IsUUID()
   storeId?: string;

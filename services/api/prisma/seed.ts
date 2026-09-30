@@ -1,43 +1,34 @@
-import { scryptSync } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import 'dotenv/config';
+import { hash as argon2Hash } from '@node-rs/argon2';
 import { PrismaPg } from '@prisma/adapter-pg';
 import type { PrismaClient as PrismaClientType } from '../src/generated/prisma/client.js';
 import { PrismaClient } from '../src/generated/prisma/client.js';
+import { appConfigValidationSchema } from '../src/config/configuration.js';
+import { PERMISSION_CODES } from '../src/auth/permission-codes.js';
 
 export const DEV_SEED_VERSION = '01';
 export const DEV_SEED_ORG_ID = '10000000-0000-4000-8000-000000000001';
 export const DEV_SEED_STORE_ID = '10000000-0000-4000-8000-000000000002';
 export const DEV_SEED_PASSWORD = 'MinimartDev@123';
-const DEV_SEED_SALT = 'minimart-dev-seed-01';
 
-function devPasswordHash() {
-  const key = scryptSync(DEV_SEED_PASSWORD, DEV_SEED_SALT, 32);
-  return `scrypt:16384:8:1:${Buffer.from(DEV_SEED_SALT).toString('base64')}:${key.toString('base64')}`;
+const ARGON2ID_ALGORITHM = 2;
+
+/**
+ * Seeded password hashes must use the same encoding as PasswordService (Argon2id),
+ * otherwise login fails with an Argon2 "Decoding failed" error at runtime.
+ */
+async function devPasswordHash(): Promise<string> {
+  const env = appConfigValidationSchema.parse(process.env);
+  return argon2Hash(DEV_SEED_PASSWORD, {
+    algorithm: ARGON2ID_ALGORITHM,
+    memoryCost: env.ARGON2_MEMORY_COST,
+    timeCost: env.ARGON2_TIME_COST,
+    parallelism: env.ARGON2_PARALLELISM,
+  });
 }
 
-export const DEV_PERMISSION_CODES = [
-  'products:create',
-  'products:update',
-  'products:deactivate',
-  'sales:create',
-  'sales:return',
-  'sales:void',
-  'inventory:view',
-  'inventory:adjust',
-  'inventory:transfer',
-  'purchasing:create',
-  'purchasing:receive',
-  'customers:view',
-  'customers:credit',
-  'reports:sales',
-  'reports:profit',
-  'cash:open',
-  'cash:close',
-  'cash:withdraw',
-  'users:manage',
-  'roles:manage',
-];
+export const DEV_PERMISSION_CODES: readonly string[] = PERMISSION_CODES;
 
 const ROLE_PERMISSIONS: Record<string, string[]> = {
   owner: DEV_PERMISSION_CODES,
@@ -324,7 +315,7 @@ type SeedContext = {
 };
 
 export async function runSeed(db: PrismaClientType) {
-  const passwordHash = devPasswordHash();
+  const passwordHash = await devPasswordHash();
   const now = new Date();
 
   const org = await db.organization.upsert({

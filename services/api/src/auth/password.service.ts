@@ -18,6 +18,12 @@ export class PasswordService {
   }
 
   async verify(password: string, encoded: string): Promise<boolean> {
-    return argon2Verify(encoded, password);
+    try {
+      return await argon2Verify(encoded, password);
+    } catch {
+      // A malformed or non-Argon2 stored hash cannot match any password.
+      // Treat it as a failed verification instead of surfacing a 500.
+      return false;
+    }
   }
 }

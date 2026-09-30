@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 
 import '../di/injection.dart';
 import '../network/api_client.dart';
-import '../network/exceptions.dart';
 import 'secure_token_storage.dart';
 
 enum AuthStatus { unknown, authenticated, unauthenticated }
@@ -68,21 +67,22 @@ class AuthState extends ChangeNotifier {
   }
 
   Future<void> logout() async {
-    if (_refreshToken != null) {
-      try {
-        final apiClient = getIt<ApiClient>();
-        await apiClient.refreshToken();
-        // Note: We call the logout endpoint with the refresh token to revoke it
-        await apiClient.dio.post(
-          '/auth/logout',
-          data: {'refresh_token': _refreshToken},
-        );
-      } catch (e) {
-        // Even if the server call fails, we should still log out locally
-        // This handles cases where the server is unreachable
-      }
+    if (_refreshToken == null) {
+      await setUnauthenticated();
+      return;
     }
-    await setUnauthenticated();
+
+    try {
+      // Revoke the refresh token as-is. Calling refreshToken() first would
+      // rotate the token, so the revoke would target a token the server has
+      // already invalidated and the old one would stay usable.
+      final apiClient = getIt<ApiClient>();
+      await apiClient.logout();
+    } catch (e) {
+      // Even if the server call fails, we should still log out locally
+      // This handles cases where the server is unreachable
+      await setUnauthenticated();
+    }
   }
 
   Future<void> refreshAccessTokenIfNeeded() async {

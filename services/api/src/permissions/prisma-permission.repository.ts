@@ -3,28 +3,48 @@ import { BaseRepository } from '../database/base.repository.js';
 import { PrismaService, type PrismaTx } from '../database/prisma.service.js';
 import { PermissionRepository } from './permission.repository.js';
 import type { PermissionQueryDto } from './dto/permission-query.dto.js';
+import type { PaginatedResponseDto } from '../users/dto/paginated-response.dto.js';
+import type { Permission } from '../generated/prisma/client.js';
+
+const SORTABLE_COLUMNS = new Set(['createdAt', 'updatedAt', 'code', 'status']);
+
+function resolveOrderBy(
+  query: PermissionQueryDto,
+): Record<string, 'asc' | 'desc'> {
+  const column =
+    query.sortBy && SORTABLE_COLUMNS.has(query.sortBy)
+      ? query.sortBy
+      : 'createdAt';
+  return { [column]: query.sortOrder ?? 'desc' };
+}
 
 @Injectable()
-export class PrismaPermissionRepository extends BaseRepository implements PermissionRepository {
+export class PrismaPermissionRepository
+  extends BaseRepository
+  implements PermissionRepository
+{
   constructor(prisma: PrismaService) {
     super(prisma);
   }
 
-  async findById(id: string, tx?: PrismaTx): Promise<any | null> {
+  async findById(id: string, tx?: PrismaTx): Promise<Permission | null> {
     return this.clientOrTx(tx).permission.findUnique({ where: { id } });
   }
 
-  async findByCode(code: string, tx?: PrismaTx): Promise<any | null> {
+  async findByCode(code: string, tx?: PrismaTx): Promise<Permission | null> {
     return this.clientOrTx(tx).permission.findUnique({ where: { code } });
   }
 
-  async findAll(query: any, tx?: PrismaTx): Promise<any> {
+  async findAll(
+    query: PermissionQueryDto,
+    tx?: PrismaTx,
+  ): Promise<PaginatedResponseDto<Permission>> {
     const client = this.clientOrTx(tx);
-    const page = query.page || 1;
-    const limit = query.limit || 20;
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: Record<string, unknown> = {};
 
     if (query.search) {
       where.OR = [
@@ -38,13 +58,13 @@ export class PrismaPermissionRepository extends BaseRepository implements Permis
     }
 
     const [data, total] = await Promise.all([
-      this.clientOrTx(tx).permission.findMany({
+      client.permission.findMany({
         where,
         skip,
         take: limit,
-        orderBy: { [query.sortBy || 'createdAt']: query.sortOrder || 'desc' },
+        orderBy: resolveOrderBy(query),
       }),
-      this.clientOrTx(tx).permission.count({ where }),
+      client.permission.count({ where }),
     ]);
 
     return {
@@ -53,18 +73,20 @@ export class PrismaPermissionRepository extends BaseRepository implements Permis
       limit,
       total,
       totalPages: Math.ceil(total / limit),
-    };
+    } as PaginatedResponseDto<Permission>;
   }
 
-  async create(data: any, tx?: PrismaTx): Promise<any> {
-    return this.clientOrTx(tx).permission.create({ data });
+  async create(data: unknown, tx?: PrismaTx): Promise<Permission> {
+    return this.clientOrTx(tx).permission.create({
+      data: data as never,
+    }) as Promise<Permission>;
   }
 
-  async update(id: string, data: any, tx?: PrismaTx): Promise<any> {
+  async update(id: string, data: unknown, tx?: PrismaTx): Promise<Permission> {
     return this.clientOrTx(tx).permission.update({
       where: { id },
-      data,
-    });
+      data: data as never,
+    }) as Promise<Permission>;
   }
 
   async delete(id: string, tx?: PrismaTx): Promise<void> {

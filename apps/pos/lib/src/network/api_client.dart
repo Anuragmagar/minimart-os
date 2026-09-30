@@ -41,7 +41,7 @@ class ApiClient {
     try {
       final response = await _dio.post(
         '/auth/refresh',
-        data: {'refresh_token': refreshToken},
+        data: {'refreshToken': refreshToken},
       );
 
       final data = response.data['data'] as Map<String, dynamic>;
@@ -50,7 +50,6 @@ class ApiClient {
       final accessTokenExpiresIn = data['accessTokenExpiresIn'] as int? ?? 900;
       final refreshTokenExpiresIn = data['refreshTokenExpiresIn'] as int? ?? 604800;
 
-      final now = DateTime.now();
       await _authState.setAuthenticated(
         accessToken,
         newRefreshToken,
@@ -71,9 +70,11 @@ class ApiClient {
     }
 
     try {
+      // /auth/logout is public and revokes by refresh token alone, so a POS
+      // terminal that has lost its access token can still sign out.
       await _dio.post(
         '/auth/logout',
-        data: {'refresh_token': refreshToken},
+        data: {'refreshToken': refreshToken},
       );
     } catch (e) {
       // Even if the server call fails, we should still log out locally
@@ -151,7 +152,7 @@ class _RefreshInterceptor extends Interceptor {
 
       final response = await _dio.post(
         '/auth/refresh',
-        data: {'refresh_token': refreshToken},
+        data: {'refreshToken': refreshToken},
       );
 
       final data = response.data['data'] as Map<String, dynamic>;

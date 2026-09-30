@@ -1,82 +1,155 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, HttpCode, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
+import { RequirePermissions } from '../common/guards/permissions.guard.js';
+import { RequireTenantScope } from '../common/guards/tenant-scope.guard.js';
+import { PERMISSION } from '../auth/permission-codes.js';
+import { TenantContextParam } from '../common/decorators/current-user.decorator.js';
+import type { TenantContext } from '../common/auth/authenticated-user.js';
 import { RoleService } from './role.service.js';
 import { CreateRoleDto } from './dto/create-role.dto.js';
 import { UpdateRoleDto } from './dto/update-role.dto.js';
 import { RoleQueryDto } from './dto/role-query.dto.js';
+import { RoleResponseDto } from './dto/role-response.dto.js';
 
 @ApiTags('Roles')
+@ApiBearerAuth()
 @Controller('roles')
+@RequirePermissions(PERMISSION.rolesManage)
+@RequireTenantScope()
 export class RoleController {
   constructor(private readonly roleService: RoleService) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  @ApiOperation({ summary: 'Create a new role' })
-  @ApiResponse({ status: HttpStatus.CREATED, description: 'Role created successfully' })
-  @ApiResponse({ status: HttpStatus.CONFLICT, description: 'Role code already exists in organization' })
-  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Validation failed' })
-  async create(@Body() createRoleDto: any): Promise<any> {
-    // In a real implementation, organizationId would come from the authenticated user's context
-    // For now, we'll throw an error to indicate this needs to be implemented
-    throw new Error('OrganizationId must be provided from context');
+  @ApiOperation({ summary: 'Create a role in the caller organization' })
+  @ApiResponse({
+    status: HttpStatus.CREATED,
+    type: RoleResponseDto,
+    description: 'Role created',
+  })
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'Role code already exists',
+  })
+  @ApiResponse({
+    status: HttpStatus.FORBIDDEN,
+    description: 'Missing roles:manage',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Validation failed',
+  })
+  async create(
+    @TenantContextParam() ctx: TenantContext,
+    @Body() createRoleDto: CreateRoleDto,
+  ): Promise<unknown> {
+    return this.roleService.create(ctx, createRoleDto);
   }
 
   @Get()
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'List roles with pagination and filters' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Roles retrieved successfully' })
+  @ApiOperation({ summary: 'List roles in the caller organization' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Roles retrieved' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'status', required: false, enum: ['active', 'inactive'] })
-  @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'sortBy', required: false, type: String })
   @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'] })
-  async findAll(@Query() query: any): Promise<any> {
-    return this.roleService.findAll(query);
+  async findAll(
+    @TenantContextParam() ctx: TenantContext,
+    @Query() query: RoleQueryDto,
+  ): Promise<unknown> {
+    return this.roleService.findAll(ctx, query);
   }
 
   @Get(':id')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Get role by ID' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Role found' })
+  @ApiOperation({ summary: 'Get a role in the caller organization' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    type: RoleResponseDto,
+    description: 'Role found',
+  })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Role not found' })
-  async findById(@Param('id') id: string): Promise<any> {
-    const role = await this.roleService.findById(id);
-    if (!role) {
-      throw new Error('Role not found');
-    }
-    return role;
+  async findById(
+    @TenantContextParam() ctx: TenantContext,
+    @Param('id') id: string,
+  ): Promise<unknown> {
+    return this.roleService.findById(ctx, id);
   }
 
   @Put(':id')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Update role' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Role updated successfully' })
+  @ApiOperation({ summary: 'Update a role in the caller organization' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    type: RoleResponseDto,
+    description: 'Role updated',
+  })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Role not found' })
-  @ApiResponse({ status: HttpStatus.CONFLICT, description: 'Role code already exists in organization' })
-  @ApiResponse({ status: HttpStatus.BAD_REQUEST, description: 'Validation failed' })
-  async update(@Param('id') id: string, @Body() updateRoleDto: any): Promise<any> {
-    return this.roleService.update(id, updateRoleDto);
+  @ApiResponse({
+    status: HttpStatus.CONFLICT,
+    description: 'Role code already exists',
+  })
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Validation failed',
+  })
+  async update(
+    @TenantContextParam() ctx: TenantContext,
+    @Param('id') id: string,
+    @Body() updateRoleDto: UpdateRoleDto,
+  ): Promise<unknown> {
+    return this.roleService.update(ctx, id, updateRoleDto);
   }
 
   @Put(':id/deactivate')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Deactivate role' })
-  @ApiResponse({ status: HttpStatus.OK, description: 'Role deactivated successfully' })
+  @ApiOperation({ summary: 'Deactivate a role, revoking its permissions' })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    type: RoleResponseDto,
+    description: 'Role deactivated',
+  })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Role not found' })
-  async deactivate(@Param('id') id: string): Promise<any> {
-    return this.roleService.deactivate(id);
+  async deactivate(
+    @TenantContextParam() ctx: TenantContext,
+    @Param('id') id: string,
+  ): Promise<unknown> {
+    return this.roleService.deactivate(ctx, id);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete role' })
-  @ApiResponse({ status: HttpStatus.NO_CONTENT, description: 'Role deleted successfully' })
+  @ApiOperation({ summary: 'Delete an unassigned role' })
+  @ApiResponse({ status: HttpStatus.NO_CONTENT, description: 'Role deleted' })
   @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Role not found' })
-  async delete(@Param('id') id: string): Promise<void> {
-    await this.roleService.delete(id);
+  @ApiResponse({
+    status: HttpStatus.BAD_REQUEST,
+    description: 'Role is still assigned to users',
+  })
+  async delete(
+    @TenantContextParam() ctx: TenantContext,
+    @Param('id') id: string,
+  ): Promise<void> {
+    await this.roleService.delete(ctx, id);
   }
 }

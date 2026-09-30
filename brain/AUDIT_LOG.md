@@ -3543,3 +3543,179 @@ Phase 04 (Auth/RBAC) (per plans/03_FLUTTER_CORE.md) or Phase 04 (Auth/RBAC), sub
 ---
 Audit performed by: Senior Software Engineer / Architecture Review
 Date: 2026-09-28
+
+---
+
+## Audit Record - Task 04.11
+
+### TASK
+Date: 2026-09-29
+Phase: 04 - Auth/RBAC
+Task: 04.11 - Auth Audit
+Agent: Senior Software Engineer / Security Review
+Status: COMPLETE
+
+### Requested Work
+
+Audit authentication and authorization for Phase 04, and fix every Critical finding. High findings were explicitly deferred by the user and are reported below rather than fixed.
+
+Work performed:
+
+1. Read the full Phase 04 implementation (backend auth, users, roles, permissions, store access) and the Flutter auth client, and compared them against AGENTS.md, brain/SECURITY.md, brain/ARCHITECTURE.md, and the 40 business rules in brain/BUSINESS_RULES.md.
+2. Classified every finding as Critical or High.
+3. Remediated all Critical findings.
+4. Added tests that would have caught each Critical finding.
+5. Ran every backend gate plus the Flutter analyzer.
+
+### User Decisions Taken During This Audit
+
+| Question | Decision |
+|----------|----------|
+| Uncommitted Phase 04 work in the working tree | Keep it and finish it, do not discard |
+| Remediation scope | Audit fully, fix Critical only, report High findings |
+| Refresh/logout request field name | camelCase `refreshToken` (canonical) |
+| POST /auth/logout | Stays public and refresh-token-only, no bearer token, so an offline POS terminal can always drop its session |
+| Offline session maximum duration | Do not invent one; record as an open decision (ASM-044) |
+| Permission codes | Use only the 20-code catalog in brain/SECURITY.md; no invented codes such as `users:view`; read access to users is gated by `users:manage` and fails closed |
+
+### Critical Findings And Fixes
+
+**C1 - The permission and tenant-scope guards were never applied to any route.**
+`RequirePermissions` and `RequireTenantScope` existed and were registered globally, but no controller carried either decorator, so every management route ran completely unauthenticated in practice. Fixed: `/users` now requires `users:manage`, `/roles` and `/permissions` require `roles:manage`, `/store-access` requires `users:manage`, and each carries `@RequireTenantScope()`. Verified by 11 new e2e tests in `test/auth-rbac.e2e-spec.ts`.
+
+**C2 - Tenant scope was derived from client input.**
+`TenantScopeGuard` read the store selector from the request body as well as the route and query string, and used it as though it proved access. Fixed: the body is no longer read (a body field is data, not a request target), the store selector is validated against the stores already granted to the principal on the server, and the organization always comes from the authenticated principal. A cross-tenant store id is now 403.
+
+**C3 - Organization and store scope were accepted from the caller in management services.**
+`UserService` wrote `body.organizationId` straight into the row, so a caller with `users:manage` in one organization could create a user in another. Roles and store access were equally unscoped. Fixed: every repository method now requires an explicit `organizationId` and the service layer always takes it from `TenantContext`. The unauthenticated case fails closed with 403.
+
+**C4 - Controllers used `@Body() any`, which bypassed validation and allowed mass assignment.**
+`UserController`, `RoleController`, `PermissionController`, and `StoreAccessController` typed their bodies as `any`, so the global `whitelist + forbidNonWhitelisted` validation pipe had nothing to validate and any column could be set, including `passwordHash` and `lastLogin`. Fixed: every body and query is a concrete DTO, and the services map fields explicitly rather than spreading the request object into Prisma.
+
+**C5 - The Flutter client and the API disagreed on the refresh token field name.**
+The client sent `refresh_token`; `RefreshDto` requires `refreshToken`, so every refresh failed validation and the client signed the user out. Fixed in `api_client.dart` and `auth_state.dart`.
+
+**C6 - The client refreshed the session immediately before logging out.**
+`AuthState.logout()` called `refreshToken()` first, which rotated the refresh token, and then revoked the rotated one. The token the client believed it was revoking had already been replaced, and the old one remained usable. Fixed: logout revokes the refresh token as presented. This also matches the decision that `/auth/logout` is public and refresh-token-only.
+
+**C7 - `refresh_tokens` had no foreign keys to `users` or `organizations`.**
+Both columns were bare UUIDs, so BR-040 was not structurally enforceable and a token row could outlive its tenant. Fixed with migration `20260929150000_add_refresh_token_fks`, adding two `ON DELETE RESTRICT` foreign keys. The migration adds no indexes because the base migration already created `refresh_tokens_user_id_idx` and `refresh_tokens_organization_id_idx`; an earlier draft created duplicate indexes and was removed.
+
+**C8 - The refresh-token migration was untracked and `schema.prisma` was not formatted.**
+The base migration `20260929064600_add_refresh_token` existed only as an untracked working-tree file, and the schema was not `prisma format` output, which broke the schema-parity test. Fixed: the migration is now tracked, the schema is formatted, `prisma validate` passes, and `prisma migrate diff` reports no drift.
+
+**C9 - Refresh token rotation was not single-use.**
+`refresh()` read the token, checked `revoked`, then revoked and inserted in separate statements. Two concurrent refreshes of the same token both observed an unrevoked row and each minted a fresh session, breaking AGENTS.md sections 21 and 22. Fixed: the conditional claim (`updateMany where id and revoked = false`) and the insert of the replacement now run in one transaction, so exactly one refresh can win. Proven by a test that fires two concurrent refreshes and asserts one success, one rejection, and one live session.
+
+**C10 - Phase 04 had no authentication or authorization tests.**
+There was no test anywhere that a protected route rejects an anonymous caller, that a refresh token is rejected as a bearer token, that a missing permission is 403, or that a deactivated role or user loses access. Fixed: `test/auth-rbac.e2e-spec.ts` (11 tests) plus `test/db/auth-rotation.spec.ts` (8 tests) and `test/db/refresh-token.schema.spec.ts` (8 tests).
+
+**C11 - A hard-coded password would have been written to any account created without one.**
+The uncommitted work hashed the constant `TempPassword123!` whenever `password` was omitted. No document defines such a policy, so this was an invented rule with a publicly known value. Fixed: `password` is required on `CreateUserDto` and the constant is gone (ASM-045).
+
+**C12 - The public routes had no explicit exemption and the whole app 401'd.**
+`/health` and `/` are reachable by the container orchestrator and the POS connectivity probe before anyone signs in, but the global guard had no way to exempt them, so health checks failed. Fixed with an explicit `@Public()` decorator applied to health, root, and the three auth credential-exchange routes. Access is deny-by-default: a route is protected unless it is explicitly marked public.
+
+### High Findings - Reported, Not Fixed (User Deferred)
+
+| ID | Finding | Why deferred |
+|----|---------|---------------|
+| H1 | No audit records are written for login, logout, refresh, permission changes, or role changes | Requires deciding the audit action vocabulary; AGENTS.md section 25 expects audit records for important mutations, and AuditService already exists from 02.11 |
+| H2 | No rate limiting or lockout on `/auth/login` | Needs a documented policy (attempts, window, lockout duration) and a Redis-backed store |
+| H3 | User and role hard-delete endpoints remain exposed | Conflicts with the audit expectation that authorization data is not destroyed; a deactivation-only policy needs a business decision |
+| H4 | `JWT_SECRET` is required but not strength-validated | Cheap to add but is a configuration policy, not an auth defect |
+| H5 | `_RefreshInterceptor` in the Flutter client fails concurrent 401s instead of queueing them | Causes a spurious sign-out under parallel requests, not an authorization bypass; the client-side concurrency model needs its own task |
+| H6 | Three brain documents are stored with corrupted character encoding | Pre-existing, unrelated to auth, and a lossy repair would damage the audit history (ASM-046) |
+
+### Business Rules Verified
+
+| Rule | Verification |
+|------|--------------|
+| BR-040 (one organization must never reach another organization's data) | Every repository call requires an explicit organization from the server-derived principal; a cross-tenant user, role, or store id returns 404 and a cross-tenant store selector returns 403; `refresh_tokens` now has real tenant foreign keys |
+| BR-007 / BR-039 (audit data is immutable) | AuditService exposes create only; the permission service now refuses to hard-delete a permission still attached to a role instead of cascading it out of every role |
+| BR-022 (idempotency) | Refresh rotation is now a single-use conditional claim in one transaction; two concurrent refreshes yield one session |
+| AGENTS.md section 13 (never trust client-supplied organization or store for authorization) | `TenantContext` is derived only from the verified principal; the tenant-scope guard no longer reads the request body |
+| AGENTS.md section 19 (passwords) | Argon2id everywhere; the seed uses the same `PasswordService`; no account can be created with a system-chosen password; the dev password exists only in dev seed data |
+
+### Files Created
+
+- `services/api/src/common/decorators/public.decorator.ts`
+- `services/api/src/common/decorators/current-user.decorator.ts`
+- `services/api/src/common/auth/authenticated-user.ts`
+- `services/api/src/common/types/express.d.ts`
+- `services/api/src/auth/permission-codes.ts`
+- `services/api/prisma/migrations/20260929150000_add_refresh_token_fks/migration.sql`
+- `services/api/test/auth-rbac.e2e-spec.ts`
+- `services/api/test/db/refresh-token.schema.spec.ts`
+- `services/api/test/db/auth-rotation.spec.ts`
+
+### Files Modified
+
+- `services/api/src/common/guards/auth.guard.ts` (server-derived principal; access-token type check; only active roles and permissions contribute; inactive user rejected)
+- `services/api/src/common/guards/permissions.guard.ts` (fails closed; reports the missing permission; requires every listed permission)
+- `services/api/src/common/guards/tenant-scope.guard.ts` (no body read; store selector validated against granted stores; unauthenticated caller rejected)
+- `services/api/src/auth/auth.module.ts` (owns the guard chain, since AuthGuard needs this module's JwtService)
+- `services/api/src/app.module.ts` (removed the duplicate guard registration)
+- `services/api/src/auth/auth.controller.ts` (explicit public credential-exchange routes)
+- `services/api/src/auth/auth.service.ts` (single-use atomic rotation; no dead store claim; no store in the access token)
+- `services/api/src/auth/jwt.service.ts`, `password.service.ts`
+- `services/api/src/health/health.controller.ts`, `src/app.controller.ts` (explicit public)
+- `services/api/src/users/` (controller, service, repository, prisma repository, `CreateUserDto`)
+- `services/api/src/roles/` (controller, service, repository, prisma repository, role DTOs)
+- `services/api/src/permissions/` (controller, service, repository, prisma repository)
+- `services/api/src/stores/` (store access controller, service, repository, prisma repository)
+- `services/api/prisma/schema.prisma` (formatted; refresh token relations; regenerated client)
+- `services/api/prisma/seed.ts` (permission catalog imported, not duplicated; Argon2id hashes)
+- `services/api/test/db/seed.schema.spec.ts` (asserts the real Argon2id algorithm instead of a stale scrypt format)
+- `apps/pos/lib/src/network/api_client.dart`, `apps/pos/lib/src/auth/auth_state.dart`
+- `brain/ASSUMPTIONS.md` (ASM-044, ASM-045, ASM-046)
+
+### Files Deleted
+
+- `login.json`, `test_login.js`, `test_login.json` (untracked scratch files left at the repository root containing the dev password; AGENTS.md section 19 forbids committing secrets)
+
+### Tests Run
+
+| Gate | Command | Result |
+|------|---------|--------|
+| Build | `npm run build` | PASS |
+| Lint | `npm run lint` (oxlint --type-aware) | PASS, 0 warnings |
+| Unit | `npm test` | PASS 82/82 |
+| E2E | `npm run test:e2e` | PASS 24/24 (was 11/13 before this task) |
+| Database | `npm run test:db` | PASS 254/254 (was 234/238) |
+| Prisma | `prisma validate` | PASS |
+| Drift | `prisma migrate diff` (no-op check) | PASS |
+| Flutter | `flutter analyze --no-pub` | PASS, no new issues |
+
+### Security
+
+- Authorization is deny-by-default. Authentication is required for every route, and a route is public only with an explicit `@Public()` marker.
+- A refresh token can never be used as an API bearer token; the token type claim is checked by `JwtService.verifyAccessToken`.
+- Deactivating a user, a role, or a permission revokes access on the next request, because the principal is rebuilt from the database on every request rather than being carried in the token.
+- No secret, password, or token is written to a log; the existing pino redaction paths are unchanged.
+- The dev password appears only in dev seed data and is Argon2id hashed by the same `PasswordService` the API uses, so seeded credentials actually work and the two cannot drift.
+
+### Offline / Sync
+
+`/auth/logout` remains reachable without a network-side session, and logout on a terminal that cannot reach the server still clears local credentials. The maximum offline session duration is intentionally undefined and recorded as ASM-044; it must be decided before Phase 11.
+
+### Assumptions
+
+ASM-044 (offline session duration, deliberately not invented), ASM-045 (initial password policy, deliberately not invented), ASM-046 (pre-existing brain document encoding corruption, not repaired).
+
+### Unresolved Issues
+
+- H1 through H6 above.
+- Audit records for authentication and authorization events are not written yet, so a role or permission change is currently not attributable in the audit trail. This is the most important deferred item.
+
+### Architectural Changes
+
+None. The layering is unchanged: controller, service, repository, Prisma. The guard chain now lives in `AuthModule` instead of `AppModule` because `AuthGuard` depends on that module's `JwtService`; a guard registered via `APP_GUARD` is still applied application-wide, but it is instantiated in the context of the module that declares it.
+
+### Next Available Task
+
+Task 04.12 per `plans/04_AUTH_RBAC.md`, if defined; otherwise the High findings H1 and H2, which are the two that carry real security weight. ASM-044 should be resolved before Phase 11.
+
+---
+Audit performed by: Senior Software Engineer / Security Review
+Date: 2026-09-29

@@ -414,3 +414,44 @@ Assumption: The Flutter architecture and foundation (Tasks 03.01-03.11) is compl
 Resolution: COMPLETED. Audit performed and passed. Tasks 03.01-03.11 (Phase 03 Flutter Core) are approved as a solid foundation.
 Impact: Phase 03 (Flutter Core) is COMPLETE. Next available: Phase 04 (Auth/RBAC) or Phase 04 (Auth/RBAC), subject to ASM-040/041.
 Status: resolved
+
+## ASM-044
+
+Task: 04.11 - Auth Audit
+Assumption: NONE TAKEN. The audit deliberately did not choose an offline session maximum duration. Task 04.10 built the offline session foundation, and brain/OFFLINE_SYNC.md defines the SyncOperation/Conflict behavior, but no document states how long a POS terminal may operate without a successful server round trip before it must refuse to trade.
+
+Reason: AGENTS.md section 5 forbids inventing business rules, and section 28 requires stopping when required behavior is undefined. A maximum offline duration is a business and tax-compliance decision for a Nepal retail operator, not an engineering default. Guessing one would silently authorize either unbounded offline trading (a compliance risk) or unnecessary terminal lockout (a revenue risk). The user confirmed this explicitly during the 04.11 audit: do not invent a duration, record it as open.
+
+Impact: The offline session remains unbounded by duration. A terminal that has not synced can continue issuing local business operations indefinitely, and each one is queued for later server validation. Nothing in the current code or schema caps this. This must be decided before the offline sync workstream (Phase 11) makes queued operations financially real, and it interacts with any future session expiry on the access token itself.
+
+Status: open - does not block Task 04.11, must be resolved before Phase 11
+
+Resolution:
+
+## ASM-045
+
+Task: 04.11 - Auth Audit
+Assumption: NONE TAKEN. An initial password policy for newly created user accounts was NOT defined by this task.
+
+Reason: The 04.11 audit found uncommitted work that would have created accounts with a hard-coded constant password (`TempPassword123!`) whenever an administrator omitted the password field. No brain document defines a temporary or initial password policy, and no document defines password complexity rules beyond "Argon2id" in brain/SECURITY.md. Rather than invent a policy (AGENTS.md section 5), the invented behavior was removed: `password` is now a required field on `CreateUserDto`, so an account can never be created with a password the system chose on the caller's behalf.
+
+Impact: The API contract for user creation is stricter than the uncommitted work intended. An administrator must supply an initial password when creating a user. There is no password reset, invitation email, or forced-rotation-on-first-login flow; those remain undefined and unimplemented.
+
+Status: open - a documented initial-password and first-login rotation policy is still required before the auth feature is production ready
+
+Resolution:
+
+## ASM-046
+
+Task: 04.11 - Auth Audit
+Finding (pre-existing defect, not introduced by this task): Three brain documents are stored with corrupted character encoding. `brain/CURRENT_STATE.md`, `brain/AUDIT_LOG.md`, and `brain/ASSUMPTIONS.md` contain mojibake sequences where characters such as em dash, arrow, and check mark should be. `CURRENT_STATE.md` was damaged by a UTF-8-as-cp1252 round trip; `AUDIT_LOG.md` and `ASSUMPTIONS.md` show a different signature consistent with a UTF-8-as-CP437 round trip, so the three files are not all damaged the same way and a single repair pass is not safe for all of them. All other brain documents are clean.
+
+Action taken in 04.11: none. The corruption predates this task, is unrelated to authentication, and a lossy repair would damage the audit history itself.
+
+Reason: AGENTS.md section 6 forbids unrelated refactors, and section 28 requires stopping when a change may destroy historical data. The audit log is the project's primary evidence trail; silently rewriting it is a worse outcome than leaving it legibly damaged.
+
+Impact: Readability of the audit history and state document is degraded. Content is not lost, and every ASCII portion is intact and greppable. The 04.11 entries were appended as clean ASCII so that no new corruption is introduced.
+
+Status: open - needs a dedicated repair task with a per-file codepage analysis and a diff review
+
+Resolution:

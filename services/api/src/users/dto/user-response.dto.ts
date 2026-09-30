@@ -25,9 +25,15 @@ export class UserResponseDto {
   @ApiProperty({ example: '2024-01-01T00:00:00.000Z' })
   updatedAt: Date;
 
-  @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000', nullable: true })
+  @ApiProperty({
+    example: '123e4567-e89b-12d3-a456-426614174000',
+    nullable: true,
+  })
   roleId: string | null;
 
-  @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174001', nullable: true })
+  @ApiProperty({
+    example: '123e4567-e89b-12d3-a456-426614174001',
+    nullable: true,
+  })
   storeId: string | null;
 }

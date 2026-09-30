@@ -1,11 +1,8 @@
 import { Module } from '@nestjs/common';
-import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE, APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_INTERCEPTOR, APP_PIPE } from '@nestjs/core';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { AuthModule } from './auth/auth.module.js';
-import { AuthGuard } from './common/guards/auth.guard.js';
-import { PermissionsGuard } from './common/guards/permissions.guard.js';
-import { TenantScopeGuard } from './common/guards/tenant-scope.guard.js';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter.js';
 import { ResponseFormatInterceptor } from './common/interceptors/response-format.interceptor.js';
 import { createValidationPipe } from './common/validation/validation-pipe.js';
@@ -50,18 +47,6 @@ import { StoresModule } from './stores/stores.module.js';
     {
       provide: APP_INTERCEPTOR,
       useClass: ResponseFormatInterceptor,
-    },
-    {
-      provide: APP_GUARD,
-      useClass: AuthGuard,
-    },
-    {
-      provide: APP_GUARD,
-      useClass: PermissionsGuard,
-    },
-    {
-      provide: APP_GUARD,
-      useClass: TenantScopeGuard,
     },
   ],
 })

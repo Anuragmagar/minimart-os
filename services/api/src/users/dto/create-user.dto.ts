@@ -1,4 +1,10 @@
-import { IsEmail, IsString, MinLength, IsOptional, IsUUID, IsEnum } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  MinLength,
+  IsOptional,
+  IsUUID,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateUserDto {
@@ -11,23 +17,32 @@ export class CreateUserDto {
   @MinLength(1)
   name: string;
 
-  @ApiProperty({ example: 'password123', required: false })
-  @IsOptional()
+  @ApiProperty({
+    example: 'Initial@Password123',
+    description:
+      'Initial password chosen by the administrator creating the account',
+  })
   @IsString()
   @MinLength(8)
-  password?: string;
+  password: string;
 
   @ApiProperty({ example: '+1234567890', required: false })
   @IsOptional()
   @IsString()
   phone?: string;
 
-  @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174000', required: false })
+  @ApiProperty({
+    example: '123e4567-e89b-12d3-a456-426614174000',
+    required: false,
+  })
   @IsOptional()
   @IsUUID()
   roleId?: string;
 
-  @ApiProperty({ example: '123e4567-e89b-12d3-a456-426614174001', required: false })
+  @ApiProperty({
+    example: '123e4567-e89b-12d3-a456-426614174001',
+    required: false,
+  })
   @IsOptional()
   @IsUUID()
   storeId?: string;
