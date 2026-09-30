@@ -3954,3 +3954,174 @@ None. The layering is unchanged: controller, service, repository, Prisma. `Units
 ## Next Available Task
 
 Task 05.04 per `plans/05_PRODUCTS.md`.
+
+### Task 05.04 - Unit Conversions
+
+Date: 2026-09-30
+Phase: 05 Products
+Agent: opencode
+Status: complete
+
+### Requested Work
+
+TASK 05.04 of `plans/05_PRODUCTS.md`: organization-scoped unit conversion management. Conversion CRUD was
+deliberately left out of 05.03, which shipped the read-only fixture and the unit-side reference counts.
+
+### Files Created
+
+- `services/api/src/unit-conversions/dto/create-unit-conversion.dto.ts`
+- `services/api/src/unit-conversions/dto/update-unit-conversion.dto.ts`
+- `services/api/src/unit-conversions/dto/unit-conversion-query.dto.ts`
+- `services/api/src/unit-conversions/dto/unit-conversion-response.dto.ts`
+- `services/api/src/unit-conversions/unit-conversion.repository.ts`
+- `services/api/src/unit-conversions/prisma-unit-conversion.repository.ts`
+- `services/api/src/unit-conversions/unit-conversion.service.ts`
+- `services/api/src/unit-conversions/unit-conversion.controller.ts`
+- `services/api/src/unit-conversions/unit-conversions.module.ts`
+- `services/api/src/unit-conversions/unit-conversion.service.spec.ts`
+- `services/api/src/unit-conversions/prisma-unit-conversion.repository.spec.ts`
+- `services/api/test/unit-conversions.e2e-spec.ts`
+- `services/api/test/db/unit-conversion.schema.spec.ts`
+
+### Files Modified
+
+- `services/api/src/app.module.ts` (registered `UnitConversionsModule`)
+- `services/api/src/audit/audit-sanitizer.ts` (class instances serialized through `toJSON`)
+- `services/api/src/audit/audit-sanitizer.spec.ts` (five new cases)
+- `brain/ASSUMPTIONS.md` (ASM-050)
+- `brain/CURRENT_STATE.md`
+
+### Files Deleted
+
+None.
+
+### Business Rules Verified
+
+- **Direction is unique per organization.** Enforced by the existing `unit_conversions`
+  `(organization_id, from_unit_id, to_unit_id)` constraint. A duplicate is reported as a conflict, not
+  silently upserted, and the DB test asserts the underlying `P2002` so a future migration cannot drop it.
+- **A reciprocal is a second explicit row, never a derived one.** `DOZ -> PCS 12` and `PCS -> DOZ 0.083333`
+  coexist. Neither is computed from the other, and `0.083333` is stored exactly as six decimals rather than
+  being recomputed as `1/12`, so the stored factor is the factor the user entered. This was an explicit user
+  decision, replacing the earlier assumption that reciprocals would be derived.
+- **Self-conversion is rejected**, with the message naming the reason.
+- **A direct reciprocal pair is permitted; cycles of length 3 or more are rejected.** The two decisions were
+  reconciled during implementation: a blanket "no reverse edge" rule would also block the two-node case the
+  user wants. The implemented walk ignores a reverse edge only when it is the immediate successor of the
+  proposed edge, and rejects any longer path home. Tested both ways, including a case where a legal reciprocal
+  pair exists and a third unit would still close a loop.
+- **Multiplier must be greater than zero**, enforced in the DTO (shape) and the service (sign), so the error
+  names the reason. Application-side only, by user decision; no migration was in scope.
+- **Direction is immutable after creation.** Only the multiplier is updatable. Inverting a factor is a delete
+  plus a create, so a direction can never be silently rewritten underneath existing transactions.
+- **Multipliers are hard-updatable and rows are hard-deleted.** The model has no `status` column, and the user
+  chose not to add soft deactivation. Every delete writes an audit record, so the history of a removed factor
+  is retained even though the row is not.
+- **Decimal exactness.** `multiplier` is `DECIMAL(14,6)`. It is accepted as a JSON number or string, validated
+  against a 8-integer/6-fractional pattern with no sign and no exponent, and always serialized as an exact
+  decimal string. A DB test asserts `0.083333` round-trips as exactly that, not `0.08333299999999999`.
+
+### Tests
+
+- 47 unit tests: service (tenant scoping, both multiplier rejection paths, self-conversion, duplicate
+  direction, reciprocal allowed, longer cycles rejected, batched edge traversal, transactional audit on
+  create/update/delete) and repository (organization filters, both unit filters, sort allow-list, join
+  selection, graph edge query).
+- 34 e2e tests over the real HTTP stack with a fake Prisma and a fake audit service: auth and permission
+  enforcement, tenant isolation, validation messages, exact decimal wire format, pagination, and the full
+  lifecycle including delete.
+- 25 DB integration tests against a provisioned PostgreSQL: unique constraint behavior, exact decimal
+  storage, reciprocal rows, cycle rejection, cross-tenant rejection, unit-delete RESTRICT behavior, real audit
+  rows, and rollback of the business write when the audit write fails.
+- 4 new sanitizer cases covering `Decimal`, `Date`, redaction beside a class instance, and the
+  no-`toJSON` fallback.
+
+### Test Results
+
+Unit 230/230, e2e 129/129, DB 344/344. Build clean, oxlint 0 warnings, Prettier clean. The 05.04 suites are
+47 unit, 34 e2e, and 25 DB tests.
+
+### Security Review
+
+Organization id is read from `TenantContext` and is never accepted from the request body; the DTO has no such
+field, so a caller cannot address another tenant. The unit foreign keys only check that the unit rows exist,
+so the service verifies both units belong to the caller's organization before writing. A DB test documents
+this by showing a cross-tenant edge is accepted when written directly through Prisma, which is precisely why
+the service check must not be dropped. A conversion in another organization is reported as not found rather
+than forbidden, so existence is not disclosed across tenants. All routes carry `@RequireTenantScope()` and
+`products:manage`. No secrets are logged and no new dependency was added.
+
+### Tenant Isolation Review
+
+Every read and write filters on `organizationId` taken from the principal, including the graph traversal used
+for cycle detection, which is organization-scoped. Two organizations may hold the same direction with
+different factors, proven by a DB test against real rows. Unit reference counts in 05.03 remain the reason a
+unit cannot be hard-deleted out from under a conversion.
+
+### Offline/Sync Review
+
+Not affected. Unit conversions are catalog reference data with no financial or inventory effect in this task.
+The Flutter local conversion table and offline catalog sync are 05.09/05.11 work. One thing worth recording:
+the multiplier wire format is an exact string, so a future Drift column for it must be a fixed-point decimal
+like the other money and quantity columns, never a `REAL`.
+
+### Database Review
+
+No migration. The existing `unit_conversions` table, its unique direction constraint, its `DECIMAL(14,6)`
+scale, and both `RESTRICT` relations were used as they stand. Two things remain unenforced at the database
+layer and are recorded in ASM-050 rather than fixed here: the multiplier is not checked for `> 0`, and the
+foreign keys do not verify that both units share the conversion's organization. The first is by user
+decision; the second is a consequence of the denormalized organization column and is currently covered by the
+service.
+
+### Defects Found and Fixed During This Task
+
+1. **Pre-existing: `sanitizeForAudit` destroyed `Decimal` audit payloads.** Unit conversion is the first
+   audited entity with a `Decimal` field, and the sanitizer rebuilt any object by copying its own enumerable
+   entries. `Prisma.Decimal` has an own enumerable `constructor` **function** among them, so the sanitized
+   payload was not JSON-serializable and the audit write failed inside the business transaction. Every
+   future money or quantity audit would have failed the same way. Fixed in the sanitizer, not worked around
+   in this module: class instances are now recorded through their `toJSON`, and only plain objects are
+   enumerated field by field. A DB test records the exact multiplier string in `before` and `after` to prove
+   the fix end to end.
+2. Response DTO declared joined units as an open `Record<string, unknown>`, which does not compile under the
+   installed `@nestjs/swagger` types. Replaced with an explicit `UnitConversionUnitRefDto` so the generated
+   OpenAPI document matches the five fields the query actually selects.
+3. Four DB-test fixtures were wrong, not the code: they used an organization A unit as the target of an
+   organization B conversion (the service correctly rejected it, the foreign key would not have), and one
+   cycle case was closed in the wrong direction so it correctly failed to be a cycle.
+4. The e2e fake Prisma shared rows across tests, so four tests passed or failed depending on execution order,
+   and it ignored `include` and top-level `skip`/`take`. Fixed with a reset between tests and honest
+   filtering, which is what made the suite order-independent.
+5. A comment in the create DTO claimed no float ever enters the system. JSON has already parsed a number to a
+   double before the transform sees it, so the claim was false for fractional factors. Reworded to state
+   that a client needing the sixth decimal place must send a string.
+
+### Self-Audit Against AGENTS.md
+
+Requirements met (05.04 only). Architecture unchanged: the new module follows the 05.01 to 05.03
+controller/service/repository pattern. Database unchanged, no migration. Security: tenant from principal,
+permission-gated, cross-tenant edges refused. Business rules: multiplier semantics derived from the seeded
+`DOZ -> PCS 12` and `BOX -> PCS 10` rows rather than invented. Offline/sync: not in scope, wire format
+recorded for 05.09. Testing: 47 unit, 34 e2e, 25 DB. Scope: no unrelated refactor; the sanitizer fix was
+required to make the audit write work at all. Documentation: ASM-050 and CURRENT_STATE updated.
+
+### Assumptions
+
+ASM-050. Reciprocals explicit, cycles of 3 or more rejected while direct pairs are allowed, multiplier
+validated above zero in the application only, direction immutable, hard delete, exact decimal wire format,
+and the service-level organization check on both units.
+
+### Unresolved Issues
+
+None introduced by this task. ASM-046 (corrupted encoding in three brain documents) remains open and was
+deliberately not touched; this entry was appended as ASCII so no new corruption was introduced.
+
+### Architectural Changes
+
+None. `UnitConversionsModule` follows the established catalog module pattern and imports `UnitsModule` so the
+unit endpoints it depends on for reference counts are registered in the same application context.
+
+### Next Available Task
+
+Task 05.05 per `plans/05_PRODUCTS.md`.

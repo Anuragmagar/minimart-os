@@ -494,3 +494,28 @@ Impact: A direct SQL insert or a future write path that bypasses the DTO could s
 Status: open - needs a database check constraint and a precision-change rule
 
 Resolution:
+
+## ASM-050
+
+Date: 2026-09-30
+Task: 05.04 - Unit Conversions
+Assumption: The following conversion rules were decided by the user because no brain document defines them, and are recorded here rather than treated as engineering defaults.
+
+1. Multiplier means "how many toUnit make up one fromUnit". This was derived, not invented: the seed already stores `DOZ -> PCS 12` and `BOX -> PCS 10`, and `brain/DOMAIN_MODEL.md` describes conversions as packaging relationships. The reverse reading would make both seeded rows smaller than one, which is not what a packaging factor is.
+2. Reciprocals are explicit rows and are never derived. `PCS -> DOZ 0.083333` is stored as its own row with its own factor; it is not computed as `1/12`, so a value such as `0.083333` survives exactly as the user typed it rather than being silently replaced by the repeating decimal.
+3. Self-conversion is rejected.
+4. A direct reciprocal pair is permitted, and cycles of length three or more are rejected. These two rules were reconciled during implementation: a blanket ban on reverse edges would also block the two-node case the user explicitly wants. The implemented cycle walk therefore ignores a reverse edge only when it is the immediate successor of the proposed edge, and rejects any longer path back to the source.
+5. The multiplier must be greater than zero. It is checked in the DTO for shape and in the service for the sign, so the error names the reason. No database CHECK constraint was added, because adding one is a migration and migrations were not in this task's scope.
+6. The multiplier may be edited and rows may be hard-deleted. The model has no `status` column and the user chose not to add soft deactivation.
+7. Direction is immutable after creation. Only the multiplier is updatable; inverting a factor is a delete plus a create, so a direction can never be rewritten underneath existing transactions. This is an implementation decision made to keep the audit trail legible rather than a user decision.
+8. `multiplier` is accepted as a JSON number or a string and is always serialized as an exact decimal string matching `DECIMAL(14,6)`. A client that needs the sixth decimal place preserved must send a string, because JSON has already parsed a number to a double before the request reaches the DTO.
+9. Cycle detection uses an iterative, batched breadth-first walk over organization-scoped outgoing edges rather than a recursive query, so a deep graph costs round trips proportional to breadth and cannot overflow the call stack. This is an implementation detail with no behavioral consequence beyond the rule in item 4.
+10. Cross-tenant conversion edges are prevented by the service, which verifies that both units belong to the caller's organization. The two foreign keys on `unit_conversions` only check that the unit rows exist, so the service check is the only barrier. A DB test writes a cross-tenant edge directly through Prisma to record this, because it is not obvious from reading the schema.
+
+Reason: AGENTS.md section 5 forbids inventing business rules. Each item above was either derived from a documented fact (items 1 and 10) or put to the user as an explicit choice (items 2 through 6, 8).
+
+Impact: A user who wants the same relationship in both directions must create two rows, and a client that sends `0.083333` as a JSON number rather than a string may receive a slightly different value back. The absence of a database-level check on the multiplier and on unit organization means any future write path that bypasses this service could persist a non-positive or cross-tenant factor, so the service-level checks must not be dropped and a later migration should add both constraints once the conversion tables are otherwise stable.
+
+Status: active - revisit if a deactivation rule, a maximum graph depth, or a database-level constraint is ever documented.
+
+Resolution:
