@@ -19,6 +19,7 @@ import { PermissionsModule } from './permissions/permissions.module.js';
 import { StoresModule } from './stores/stores.module.js';
 import { CategoriesModule } from './categories/categories.module.js';
 import { BrandsModule } from './brands/brands.module.js';
+import { UnitsModule } from './units/units.module.js';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { BrandsModule } from './brands/brands.module.js';
     StoresModule,
     CategoriesModule,
     BrandsModule,
+    UnitsModule,
     AuditModule,
     IdempotencyModule,
   ],

@@ -3876,3 +3876,81 @@ None. The layering is unchanged: controller, service, repository, Prisma. `Brand
 ## Next Available Task
 
 Task 05.03 per `plans/05_PRODUCTS.md`.
+
+# Task 05.03 - Units
+
+Date: 2026-09-30
+Audit performed by: Senior Software Engineer / Feature Review
+
+## Summary
+
+Implemented organization-scoped unit management on the existing `Unit` model. The Prisma model, its `@@unique([organizationId, code])` constraint, and its `UnitStatus` enum already existed from Phase 01 task 01.04, so no migration was required and no schema change was made.
+
+Units are flat catalog master data, so this follows the 05.02 brands module exactly. The notable difference is the delete guard: a unit is referenced by products, by conversions as the source, and by conversions as the target, so all three counts are checked and the message names the blocking relation. Reading the conversion counts is not a leak of 05.04 scope; refusing to orphan a conversion is part of making unit deletion safe.
+
+## Permission Decision
+
+Unit routes reuse the existing `products:manage` code, exactly as 05.01 and 05.02 did. No `units:manage` code was added, so the catalog remains at 21 codes and `brain/SECURITY.md`, `permission-codes.ts`, and the seed are untouched. This is the continuation of ASM-048 rather than a new decision, and the `products:manage` code is still recorded as a discretionary choice to revisit if catalog administration ever needs separating from product administration.
+
+## Business Rules Verified
+
+- Tenancy: the organization is taken from the authenticated principal only. The DTO does not accept `organizationId`, and a request that supplies one is rejected by validation rather than silently ignored. A unit belonging to another tenant is reported as not found, not forbidden, so existence is not disclosed across tenants.
+- Uniqueness: codes are unique per organization by the existing database constraint, proven against real PostgreSQL with a `P2002` assertion. The service pre-check produces a clean 409; the constraint is the actual guarantee. The name is deliberately not unique, and a test proves two units may share a name in one organization.
+- Casing: codes are stored exactly as supplied. No brain document defines a casing rule, so none was invented, and a test proves `mt` and `MT` are distinct codes. This is a documented consequence rather than a bug, but it means two visually similar codes can exist.
+- Precision: `precision` is read as decimal places and validated as an integer 0-3, derived from the `NUMERIC(14,3)` quantity scale in `docs/DATABASE_CONVENTIONS.md` and consistent with the 0, 2, 3 values in the seed. Recorded as ASM-049 because no document defines the field, and the range is enforced in the DTO only, not by a database check constraint.
+- Financial immutability: this task creates no financial or ledger rows and touches no money. `precision` changes do not affect existing stored quantities.
+- Delete safety: products, `conversionsFrom`, and `conversionsTo` are all counted and all block deletion. A DB test proves `products.unit_id` is RESTRICT, so the service count converts a raw foreign-key error into an actionable message.
+- Audit: create, update, deactivate, and delete write an audit record inside the same transaction as the business write. A DB test rolls the unit back when the audit write fails, proving the unit is not left behind unaudited.
+
+## Scope Control
+
+Unit conversions are referenced but not managed. No conversion route, DTO, or service was created; that is Task 05.04. The seeded conversions remain the only conversion rows and are untouched by any write path in this task.
+
+No Flutter work. No schema migration, no new dependency, no change to the permission catalog, and no change to `brain/BUSINESS_RULES.md`.
+
+## Tests
+
+- Unit: 179 passing, up from 147. 32 new tests across `src/units/unit.service.spec.ts` and `src/units/prisma-unit.repository.spec.ts`, covering principal-derived tenancy, duplicate codes, same-organization code reuse, partial updates, the own-code no-op, the three delete guards, cross-organization delete refusal, and audit before/after payloads.
+- E2E: 95 passing, up from 65. 30 new tests in `test/units.e2e-spec.ts`, covering 401 and 403, tenant isolation on list and read, code casing, a rejected injected `organizationId`, the precision boundaries 0, 3, 4, -1, and 1.5, duplicate-code 409, cross-tenant code reuse, search over name and code, partial update, deactivate, all three delete guards, and a same-code-different-tenant duplicate. `PrismaService` and `AuditService` are overridden with fakes, so the suite cannot reach the live development database.
+- DB integration: 319 passing, up from 291. 28 new tests in `test/db/unit.schema.spec.ts` against real PostgreSQL, covering the `P2002` unique constraint, same-code-different-tenant insert, casing preservation, tenant-scoped reads, pagination totals, search, status filtering, allow-listed sorting, the collision rejection, all three delete guards, the `P2003` RESTRICT proof, delete after the reference is gone, deactivated units still backing products, real audit rows, and the audit-failure rollback.
+- Build, oxlint with type-aware rules (0 warnings), and prettier all clean.
+
+### Test defects found and fixed during this task
+
+- An audit assertion in the service spec failed because the default `update` fixture returned no updated field, so the recorded `after` payload was empty. The fixture was corrected; no production code changed.
+- A DB test passed a unit id as the third argument to `findByCode`, which is a transaction parameter, so the repository received a string where it expected a transaction client. The test was corrected, and the casing assertion was rewritten to use the service instead.
+- Two DB list assertions forgot the seeded `PCS` fixture unit and failed on the organization total and the active-status filter. Both were corrected to account for the fixture. The failures were test-fixture errors, not product defects.
+- Docker Desktop was not running and the dev PostgreSQL container was stopped, so the DB suite could not connect. The engine and the compose stack were started and the gate was re-run rather than skipping it.
+
+## Security
+
+- Deny-by-default: `AuthGuard`, `PermissionsGuard` requiring `products:manage`, and `TenantScopeGuard` run application-wide, and every route carries `@RequireTenantScope()`.
+- Repository queries are organization-scoped at the query level, so an omitted `organizationId` returns nothing. Unit tests assert the organization is always part of the query, including for the duplicate-code lookup.
+- `organizationId` is not in the sort allow-list, so a caller cannot order rows by tenant or probe ordering; a unit test asserts it falls back to the default and an e2e test asserts the request still succeeds.
+- The organization is never read from the request body, query, or path.
+- Audit before/after payloads go through the existing `sanitizeForAudit`. No secret, password, or token is logged.
+
+## Offline / Sync
+
+Not touched. This task is server-side only. The Flutter local unit table already exists from the earlier local-schema work; this task makes no claim about local behaviour or sync, which belong to later Phase 05 tasks.
+
+## Assumptions
+
+ASM-049 (the meaning and legal range of `precision`, and that the range is enforced in the DTO only). ASM-048 continues to apply to the reused `products:manage` code. No assumption was taken about code casing, because the absence of a rule was implemented as literal storage rather than as a guessed normalization. Unit name length and character set are not defined by any brain document and were not invented; the implementation applies the same generic `MinLength(1)` already used by the categories and brands modules.
+
+## Unresolved Issues
+
+None blocking. Two are inherited and one is new:
+
+- Inherited from 05.01 and 05.02: the delete reference counts are read outside the delete transaction, so a concurrent product or conversion insert could still surface as a raw foreign-key error rather than the clean 400. The database rejects the delete either way, so this is a message-quality issue, not a data-integrity one.
+- Inherited behaviour: deactivating a unit that active products still reference is permitted, matching categories in 05.01 and brands in 05.02. This is deliberate and tested, but whether an active product should be allowed to point at an inactive unit is not defined by any brain document.
+- New: `precision` may be lowered on a unit that already has stock or history, because no rule restricts changing it once references exist, and the range is not enforced by a database check constraint. Both are recorded inside ASM-049 and should be resolved before the value is relied upon financially, at the latest in 05.04 or the inventory work.
+- Also new and inherited: `update` accepts `status`, so a unit can be reactivated through `PUT /api/v1/units/:id` as well as the dedicated `deactivate` route. The two paths overlap, exactly as in 05.02.
+
+## Architectural Changes
+
+None. The layering is unchanged: controller, service, repository, Prisma. `UnitsModule` follows the same shape as `CategoriesModule` and `BrandsModule` and is registered in `AppModule`. No schema migration, no new dependency, no change to the permission catalog.
+
+## Next Available Task
+
+Task 05.04 per `plans/05_PRODUCTS.md`.

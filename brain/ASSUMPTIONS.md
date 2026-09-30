@@ -481,3 +481,16 @@ Impact: Any user who may manage categories may also manage brands, units, and la
 Status: open - revisit if catalog administration needs its own permission code
 
 Resolution:
+
+## ASM-049
+
+Task: 05.03 - Units
+Assumption: `Unit.precision` is the number of decimal places a quantity in that unit may carry, and is constrained to the integer range 0-3 by the request DTO. The database column itself is an unconstrained `Int`, and no check constraint was added.
+
+Reason: No brain document defines what `precision` means or what values are legal. The range was derived from two documented facts rather than invented. `docs/DATABASE_CONVENTIONS.md` stores every quantity as `NUMERIC(14,3)`, so no quantity anywhere in the system can express more than three decimal places and a unit advertising four would promise precision the ledger cannot hold. The seed already uses 0, 2, and 3, which is consistent with a decimal-place reading. Enforcing the rule only in the DTO keeps it out of the database, because a migration touching an existing column on a catalog table was not justified by this task; `products:manage` governs writes to units, and every write path goes through that DTO.
+
+Impact: A direct SQL insert or a future write path that bypasses the DTO could store a precision above 3, and the mismatch would surface later as a quantity that cannot be recorded exactly. Precision may also be edited downward on a unit that already has stock or history, because no rule restricts changing it once references exist. Both need a documented rule and a database check constraint before the value is relied upon financially. Revisit in 05.04 or with the inventory work, whichever comes first.
+
+Status: open - needs a database check constraint and a precision-change rule
+
+Resolution:
