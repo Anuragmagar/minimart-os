@@ -468,3 +468,16 @@ Impact: A category chain of unbounded length is representable. The ancestor walk
 Status: open - revisit if a maximum category depth is ever required
 
 Resolution:
+
+## ASM-048
+
+Task: 05.02 - Brands
+Assumption: Brand routes reuse the existing `products:manage` permission code. No new `brands:manage` code was added to the catalog.
+
+Reason: A permission code is a business-rule change, so adding one is a decision rather than an implementation detail (AGENTS.md section 5). Two documented facts pointed to reuse without asking: `brain/BRAIN.md` groups the catalog as "Organization -> Products -> Categories -> Brands -> Units", and Task 05.01 already introduced `products:manage` and the user explicitly decided that category reads and writes are gated by it. Brands are the adjacent flat master-data entity in the same catalog, so splitting brands onto their own code would have added a catalog entry that no document asks for. The catalog therefore stays at 21 codes and `brain/SECURITY.md`, the seed, and the guards are all unchanged by this task.
+
+Impact: Any user who may manage categories may also manage brands, units, and later product master data under the same code. If catalog administration is ever to be separated from product administration, that is a documented catalog change affecting SECURITY.md, the seed, and every catalog route, and this assumption should be closed then.
+
+Status: open - revisit if catalog administration needs its own permission code
+
+Resolution:

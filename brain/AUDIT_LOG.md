@@ -3794,3 +3794,85 @@ None. The layering is unchanged: controller, service, repository, Prisma. `Categ
 ## Next Available Task
 
 Task 05.02 per `plans/05_PRODUCTS.md`.
+
+---
+
+# Task 05.02 - Brands
+
+Date: 2026-09-30
+Audit performed by: Senior Software Engineer / Feature Review
+
+## Summary
+
+Implemented organization-scoped brand management on the existing `Brand` model. The Prisma model, its `@@unique([organizationId, name])` constraint, and its `BrandStatus` enum already existed from Phase 01 task 01.04, so no migration was required and no schema change was made.
+
+Brands are flat catalog master data, so this is the 05.01 categories module without the hierarchy: no parent, no re-parenting, no ancestor walk, no cycle detection. The module, repository, DTOs, audit behaviour, and delete guard follow the same shape, which keeps the two catalog resources consistent for the client and for later tasks.
+
+## Permission Decision
+
+Brand routes reuse the `products:manage` code introduced in 05.01. No `brands:manage` code was added, so the catalog remains at 21 codes and `brain/SECURITY.md`, `permission-codes.ts`, and the seed are all untouched by this task.
+
+This was a discretionary choice and is recorded as ASM-048 rather than presented as settled. A permission code is a business-rule change under AGENTS.md section 5, so it was not invented. Two documented facts pointed to reuse: `brain/BRAIN.md` groups the catalog as "Organization -> Products -> Categories -> Brands -> Units", and the user already decided in 05.01 that category reads and writes are gated by `products:manage`. If catalog administration is ever meant to be separated from product administration, that is a catalog change touching SECURITY.md, the seed, and every catalog route.
+
+## Business Rules Verified
+
+- A brand belongs to exactly one organization, taken from the authenticated principal. A caller-supplied `organizationId` in a payload is stripped by the validation pipe and never reaches the service; an e2e test asserts the row is not created and does not appear in the list.
+- Brand names are unique per organization. The service pre-checks and returns 409; the existing database constraint remains the authority, and a DB test confirms the same name is accepted in a different organization.
+- A rename that collides with another brand is rejected, but a brand may keep its own name, so a no-op rename is not a false conflict.
+- Hard delete is refused while any product references the brand. `deactivate` is the soft path and leaves the brand attached to its products, so product history survives. A DB test confirms this end to end.
+- Cross-organization access by id returns not-found rather than forbidden, so a caller cannot probe another tenant's data. An e2e test also confirms the foreign brand is still readable by its own tenant after another tenant's delete is refused.
+- An update writes only the fields actually supplied.
+
+## Decisions Requiring the Database, Not the Service
+
+One DB test asserts that `prisma.brand.delete` raises `P2003` when a product still references the brand. This documents that `products.brand_id` is RESTRICT and that the service's reference count exists to convert a raw foreign-key error into an actionable instruction rather than to prevent a state the database already forbids.
+
+Unlike categories, no structural rule needed service-level enforcement here: a brand has no parent, so there is no cross-tenant edge and no cycle for the database to accept.
+
+## Transactions
+
+`create`, `update`, `deactivate`, and `delete` each run inside `PrismaService.runInTransaction`, with the audit record written through the same transaction handle. A DB test forces the audit write to reject and asserts the brand row is absent afterwards.
+
+## Tests Run
+
+- Unit: 147 passing, up from 119. 28 new brand tests: 17 service and 11 repository.
+- E2E: 65 passing, up from 45. 20 new tests in `test/brands.e2e-spec.ts`.
+- DB integration: 291 passing, up from 274. 17 new tests in `test/db/brand.schema.spec.ts`.
+- Build, oxlint (0 warnings), and prettier all clean.
+
+### Test defects found and fixed during this task
+
+- The e2e fake Prisma delegate filtered `findMany` on `organizationId` only, so the `status=inactive` test passed for the wrong reason: the filter the repository sent was being dropped by the fake. The fake now applies the `status` and `search` filters it is given, so the test actually exercises the filter path.
+- Three unit assertions failed on first run for fixture reasons rather than product defects, and one oxlint warning was raised for an unused destructured binding. All were corrected; no production code changed in response to any of them.
+
+## Security
+
+- Deny-by-default: `AuthGuard`, `PermissionsGuard` requiring `products:manage`, and `TenantScopeGuard` run application-wide, and every route carries `@RequireTenantScope()`.
+- Repository queries are organization-scoped at the query level, so an omitted `organizationId` returns nothing rather than another tenant's rows. Unit tests assert the organization is always part of the query, including for the duplicate-name lookup.
+- `organizationId` is explicitly not in the sort allow-list, so a caller cannot use `sortBy` to order rows by tenant or probe ordering; a unit test asserts it falls back to the default.
+- The organization is never read from the request body, query, or path.
+- Audit before/after payloads go through the existing `sanitizeForAudit`. No secret, password, or token is logged.
+
+## Offline / Sync
+
+Not touched. This task is server-side only. The Flutter local brand table already exists from 03.07; this task makes no claim about local behaviour or sync, which belong to later Phase 05 tasks.
+
+## Assumptions
+
+ASM-048 (brands reuse `products:manage`, discretionary and recorded rather than invented). No other assumption was taken. Brand name length and character set are not defined by any brain document and were not invented; the implementation applies the same generic `MinLength(1)` already used by the categories module, and no reactivation endpoint was added because the documented `BrandStatus` enum permits `active` through the existing update route.
+
+## Unresolved Issues
+
+None blocking. Two carry-overs and one new item are worth recording:
+
+- Inherited from 05.01: the brand delete reference count is read outside the delete transaction, so a concurrent product insert could still surface as a raw foreign-key error rather than the clean 400. The database rejects the delete either way, so this is a message-quality issue, not a data-integrity one.
+- Deactivating a brand that active products still reference is permitted, matching the category behaviour in 05.01. This is deliberate and tested, but whether an active product should be allowed to point at an inactive brand is not defined by any brain document.
+- New: `update` accepts `status`, which means a brand can be reactivated through `PUT /api/v1/brands/:id`. The dedicated `deactivate` route exists for clarity, so the two paths overlap. Not a defect, but the API surface could be narrowed if only soft-deactivation is ever wanted.
+
+## Architectural Changes
+
+None. The layering is unchanged: controller, service, repository, Prisma. `BrandsModule` follows the same shape as `CategoriesModule` and is registered in `AppModule`. No schema migration, no new dependency, no change to the permission catalog.
+
+## Next Available Task
+
+Task 05.03 per `plans/05_PRODUCTS.md`.

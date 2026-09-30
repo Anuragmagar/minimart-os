@@ -18,6 +18,7 @@ import { RolesModule } from './roles/roles.module.js';
 import { PermissionsModule } from './permissions/permissions.module.js';
 import { StoresModule } from './stores/stores.module.js';
 import { CategoriesModule } from './categories/categories.module.js';
+import { BrandsModule } from './brands/brands.module.js';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { CategoriesModule } from './categories/categories.module.js';
     PermissionsModule,
     StoresModule,
     CategoriesModule,
+    BrandsModule,
     AuditModule,
     IdempotencyModule,
   ],
