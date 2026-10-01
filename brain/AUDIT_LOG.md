@@ -4606,3 +4606,182 @@ removes a direct Prisma reach-through from the product write path rather than ad
 ### Next Available Task
 
 Task 05.08 per `plans/05_PRODUCTS.md`.
+
+## 2026-10-01 - Task 05.08 - Prices (price history and effective periods)
+
+### Task
+
+TASK 05.08 - Prices, from `plans/05_PRODUCTS.md`. Objective: price history and effective
+periods. Status: complete.
+
+### Summary
+
+Added management of price periods on the existing `ProductPrice` model. No migration was
+required: the model, its `@@index([productId, priceType, effectiveFrom])`, and the
+`products.id` RESTRICT reference were all already in the schema from the 01.04 product
+migration, and the product delete guard added in 05.05 already counted `productPrice` rows,
+so a product with any price history cannot be hard deleted. The task adds no schema change,
+no seed change, and no edit to an existing module.
+
+New module `services/api/src/prices`: `PriceRepository` contract,
+`PrismaPriceRepository`, `PriceService`, `PriceController`, `PricesModule`, and four DTOs.
+`PricesModule` is registered in `AppModule` and imports `DatabaseModule`, `AuditModule`, and
+`ProductsModule` for the parent product lookup.
+
+Routes, all nested under `/api/v1/products/:productId/prices`, all requiring
+`products:manage` and carrying `@RequireTenantScope()`: `GET` (paged, `priceType` filter,
+`effectiveOn` filter, sort allow-list, default `effectiveFrom` descending), `GET /:id`,
+`POST`, `PUT /:id` (retirement only), `DELETE /:id`.
+
+Business rules applied. The amount is any non-negative value that fits `NUMERIC(14,2)`, at
+most 12 integer digits and 2 decimal places, with no business cap, so zero, a large price,
+and a two-decimal price are accepted while a negative value, exponent notation, and more than
+two decimals are refused. A price period is append-only history: `amount`, `priceType`, and
+`effectiveFrom` are immutable and the update DTO carries only `effectiveTo`, so a changed
+price is a retirement plus an insert. Two periods of the same `(productId, priceType)` may
+never intersect, including in the past, so the price in force at any instant is unique;
+windows are half-open, so a successor may start at exactly the instant its predecessor ends.
+Delete is refused once a period has started, so price history is never erased.
+
+### Files Created
+
+- `services/api/src/prices/price.repository.ts`
+- `services/api/src/prices/prisma-price.repository.ts`
+- `services/api/src/prices/price.service.ts`
+- `services/api/src/prices/price.controller.ts`
+- `services/api/src/prices/prices.module.ts`
+- `services/api/src/prices/dto/create-price.dto.ts`
+- `services/api/src/prices/dto/price-query.dto.ts`
+- `services/api/src/prices/dto/price-response.dto.ts`
+- `services/api/src/prices/dto/update-price.dto.ts`
+- `services/api/src/prices/price.service.spec.ts`
+- `services/api/src/prices/prisma-price.repository.spec.ts`
+- `services/api/test/prices.e2e-spec.ts`
+- `services/api/test/db/price-service.integration.spec.ts`
+
+### Files Modified
+
+- `services/api/src/app.module.ts` (registers `PricesModule`)
+- `brain/CURRENT_STATE.md` (price routes, routes summary, risk 12, last audit, last
+  updated)
+- `brain/ASSUMPTIONS.md` (ASM-054)
+- `brain/AUDIT_LOG.md` (this entry)
+
+No product, barcode, tax category, or other existing module file changed.
+
+### Files Deleted
+
+None.
+
+### Business Rules Verified
+
+- BR-035: historical sale prices are preserved. A sale resolves a price at its own
+  transaction time, and because a price period is immutable once written, a later price
+  change cannot alter what an earlier sale used. Verified in the DB suite by writing a
+  period, inserting a successor, and asserting the earlier row is byte-identical.
+- BR-040: tenant isolation. `product_prices` has no `organization_id`, so the tenant is
+  reached through the parent product on both the single read and the overlap candidate
+  query. A cross-tenant product id is reported as a missing product rather than a missing
+  price or a forbidden one, so existence is not disclosed. A price belonging to one product
+  is not reachable under a different product path even inside the same tenant.
+- AGENTS.md section 12: money is `NUMERIC(14,2)` and never a float. The amount is passed as
+  a string into `Prisma.Decimal`, and the DB suite asserts `150.55` and `999999999999.99`
+  survive the round trip.
+- AGENTS.md section 15: a posted financial record is not edited in place. A price change is a
+  retire plus an insert rather than an in-place amount edit, so the superseded price
+  survives as history rather than being overwritten.
+- AGENTS.md section 21: multi-entity operations are atomic. The overlap check, the business
+  write, and the audit record share one transaction, verified by a DB test asserting that a
+  forced failure leaves neither the row nor the audit record.
+- AGENTS.md section 25: important mutations are audited. Create, retire, and delete each
+  write an audit record in the same transaction as the business write.
+- AGENTS.md section 24: no tax rate and no price is hardcoded into business logic. The price
+  module stores and returns configured prices and computes nothing.
+
+### Tests Run
+
+- `npx vitest run` (full unit suite)
+- `npx vitest run --config vitest.config.e2e.ts` (full e2e suite)
+- `npx vitest run --config vitest.config.db.ts` (full DB suite against real PostgreSQL)
+- `npm run build`
+- `npx oxlint --type-aware src/ test/`
+- `npm run format:check`
+
+### Test Results
+
+- Unit: 438/438 passing across 34 files. 59 of these are new: 28 in `price.service.spec.ts`
+  and 30 in `prisma-price.repository.spec.ts`.
+- E2E: 271/271 passing across 13 files, including 46 new in `prices.e2e-spec.ts` covering
+  routing, permissions, tenant scope, the validation pipe, immutability, overlap rejection
+  through HTTP, the delete guard, and the audit records.
+- DB: 437/437 passing across 29 files, including 33 new in
+  `price-service.integration.spec.ts` against real PostgreSQL covering the numeric
+  round trip, the `NUMERIC(14,2)` ceiling, adjacency at a shared boundary, same-type and
+  cross-type overlap, reopen, the delete guard at and after the start instant, immutability
+  of a superseded row, transaction rollback, and the `RESTRICT` guard on a product that
+  has price history.
+- Build clean, oxlint 0 warnings, prettier clean.
+
+### Security
+
+No secrets, credentials, or tokens are stored, logged, or committed. The routes require
+`products:manage` and `@RequireTenantScope()`, reusing the code the whole catalog chain
+already uses rather than adding a new permission, and the organization is taken from the
+authenticated principal rather than from the request, so a client cannot reach another
+tenant by supplying an organization id. No organization or store id is accepted in any price
+DTO. The request body is validated by the global pipe, and because the update DTO does not
+declare `amount`, `priceType`, or `effectiveFrom`, an attempt to change them is refused with 400
+rather than silently ignored. Amount input is pattern-checked before it reaches Prisma, so no
+unvalidated string reaches a numeric column.
+
+### Offline/Sync
+
+No offline or sync behavior is implemented or claimed. This task is a server-side
+configuration CRUD surface. The local price table, the offline catalog search, the POS scan
+path, and sync of price changes to devices belong to 05.09, 05.10, 05.11, and 08.03. In
+particular nothing here establishes an operation id or an idempotency key for a price change,
+which the two-request retire-then-insert pattern will need once a device can perform it
+offline; that gap is recorded under Unresolved Issues rather than papered over.
+
+### Assumptions
+
+Five rules were undefined in every brain document and were put to the user as explicit
+choices: the route shape, the amount bounds, which fields are editable, whether a back-dated
+insert may overlap a past window, and whether a period may be deleted. All five answers are
+recorded as ASM-054 and summarized in `brain/ASSUMPTIONS.md`. No business rule, tax rate, or
+permission was invented: the amount bound is the existing column scale, the permission reuses
+`products:manage`, and the tenant rule follows from the table having no organization column.
+
+### Unresolved Issues
+
+1. The overlap rule is a service pre-check, not a database exclusion constraint, so two
+   concurrent overlapping inserts on the same product and price type can both commit. The
+   composite index keeps the check cheap, not serializable. Resolving this needs a PostgreSQL
+   exclusion constraint with a GiST index, which Prisma cannot express and which therefore
+   needs a hand-written migration.
+2. A price change is a retire plus an insert across two requests, which are not atomic. A
+   failure between them leaves the product with no price in force until the insert is retried.
+   A single endpoint that supersedes a period and creates its successor in one transaction
+   would close this, but it is not part of this task and was not requested.
+3. Nothing requires a product to have any price at all, and no at-least-one-price check is
+   implemented, so a product can currently be offered with no price defined. Whether the POS
+   must refuse to sell an unpriced product, and how it surfaces that, belongs to 08.03.
+4. `priceType` is free text with no case normalization and no authoritative list of Nepal
+   price types, so `Retail` and `retail` are two independent series and a typo silently
+   creates a new series rather than failing.
+5. No current-price endpoint exists by design. The listing answers the same question through
+   `effectiveOn`, which is sufficient for a caller that knows the instant it cares about, but
+   a client that wants "now" must pass the current time explicitly. Confirm this is acceptable
+   for the POS client when 05.10 and 08.03 are specified.
+
+### Architectural Changes
+
+None. `PricesModule` follows the established catalog module pattern of repository contract,
+Prisma implementation, service, thin controller, and DTOs, and it is the first module to reach
+its tenant through a parent entity rather than its own organization column. That is a
+consequence of the existing schema, not a new pattern, and it is the same arrangement
+`product_barcodes` already uses.
+
+### Next Available Task
+
+Task 05.09 per `plans/05_PRODUCTS.md`.

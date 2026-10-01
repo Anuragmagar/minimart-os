@@ -23,6 +23,7 @@ import { UnitsModule } from './units/units.module.js';
 import { UnitConversionsModule } from './unit-conversions/unit-conversions.module.js';
 import { ProductsModule } from './products/products.module.js';
 import { BarcodesModule } from './barcodes/barcodes.module.js';
+import { PricesModule } from './prices/prices.module.js';
 import { TaxCategoriesModule } from './tax-categories/tax-categories.module.js';
 
 @Module({
@@ -43,6 +44,7 @@ import { TaxCategoriesModule } from './tax-categories/tax-categories.module.js';
     UnitConversionsModule,
     ProductsModule,
     BarcodesModule,
+    PricesModule,
     TaxCategoriesModule,
     AuditModule,
     IdempotencyModule,
