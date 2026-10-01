@@ -22,6 +22,7 @@ import { BrandsModule } from './brands/brands.module.js';
 import { UnitsModule } from './units/units.module.js';
 import { UnitConversionsModule } from './unit-conversions/unit-conversions.module.js';
 import { ProductsModule } from './products/products.module.js';
+import { BarcodesModule } from './barcodes/barcodes.module.js';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { ProductsModule } from './products/products.module.js';
     UnitsModule,
     UnitConversionsModule,
     ProductsModule,
+    BarcodesModule,
     AuditModule,
     IdempotencyModule,
   ],

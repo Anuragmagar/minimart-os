@@ -4124,7 +4124,9 @@ unit endpoints it depends on for reference counts are registered in the same app
 
 ### Next Available Task
 
-Task 05.05 per `plans/05_PRODUCTS.md`.### Task 05.05 - Product Master
+Task 05.05 per `plans/05_PRODUCTS.md`.
+
+### Task 05.05 - Product Master
 
 Date: 2026-10-01
 Phase: 05 Products
@@ -4275,3 +4277,174 @@ None. `ProductsModule` follows the established catalog module pattern.
 
 Task 05.06 per `plans/05_PRODUCTS.md`.
 
+### Task 05.06 - Product Barcodes
+
+Date: 2026-10-01
+Phase: 05 Products
+Agent: opencode
+Status: complete
+
+### Requested Work
+
+TASK 05.06 of `plans/05_PRODUCTS.md`: barcode management. Five rules were undefined in the brain
+documents, so they were put to the user before any code was written and the answers are recorded as
+ASM-052.
+
+### Files Created
+
+- `services/api/src/barcodes/barcode.repository.ts`
+- `services/api/src/barcodes/prisma-barcode.repository.ts`
+- `services/api/src/barcodes/barcode.service.ts`
+- `services/api/src/barcodes/barcode.controller.ts`
+- `services/api/src/barcodes/barcodes.module.ts`
+- `services/api/src/barcodes/dto/create-barcode.dto.ts`
+- `services/api/src/barcodes/dto/update-barcode.dto.ts`
+- `services/api/src/barcodes/dto/barcode-response.dto.ts`
+- `services/api/src/barcodes/barcode.service.spec.ts`
+- `services/api/src/barcodes/prisma-barcode.repository.spec.ts`
+- `services/api/test/barcodes.e2e-spec.ts`
+- `services/api/test/db/barcode-service.integration.spec.ts`
+
+### Files Modified
+
+- `services/api/src/app.module.ts` (registered `BarcodesModule`)
+- `brain/ASSUMPTIONS.md` (ASM-052)
+- `brain/CURRENT_STATE.md`
+
+### Files Deleted
+
+None.
+
+### Business Rules Verified
+
+- **A value is unique per organization, not per product.** The existing `@@unique([organizationId,
+  barcode])` enforces it, and the service pre-checks it so a duplicate is a 409 rather than a raw
+  constraint error. A DB test creates the same value in two organizations and both rows survive, which
+  is why `organization_id` is denormalized onto the row instead of being inferred through the product.
+- **A product has at most one primary barcode, and a primary is optional.** Promotion demotes the
+  previous primary in the same transaction, so a product is never observed with two primaries inside a
+  transaction. No barcode is required to be primary, and removing the primary leaves the product with
+  none: no document says which remaining code should inherit the role, so no successor is invented. Both
+  branches are covered by DB tests and by the e2e list assertion that exactly one primary survives.
+- **The value is immutable after creation.** The update DTO does not carry the field and the global
+  validation pipe runs with `forbidNonWhitelisted`, so an attempt to change it is a 400 with a field
+  error rather than a silent drop. A mistyped code is corrected by a delete plus a create, both audited.
+- **A value is free text, not a digit pattern.** Bounded at 64 characters and stored exactly as supplied,
+  with no trimming and no case folding, because a scanner reads the printed string back. `barcodeType` is
+  free text up to 32 characters with no allowed-value set, and nothing in the system reads it.
+- **Barcodes are nested under their product.** The parent product is the thing that authorizes the call,
+  so a barcode can never be filed against a product the caller did not name.
+- **Scan lookup is out of scope.** Resolving a scanned code to a product belongs to the offline catalog
+  search (05.10) and the POS scan path (08.03), so no server-side lookup route was added.
+- **The collection is unpaged.** A product carries a handful of codes and there is no filter to narrow it
+  by; a repository test asserts no `skip` or `take` is ever sent.
+
+### Tests
+
+- 26 unit tests on the service: parent resolution before any barcode read, cross-tenant product and
+  sibling-product refusals, organization-wide value conflict, defaults, demote-before-promote ordering,
+  explicit-null clearing against omitted fields, audit payload shape for all three actions, no-op update,
+  no automatic promotion on delete, and ambient-transaction joining.
+- 11 unit tests on the repository: triple-keyed lookup, the organization-wide value lookup carrying no
+  product predicate, the unpaged ordered collection, write methods, and the demotion predicate.
+- 25 e2e tests over the real HTTP stack with a fake Prisma and a fake audit service: 401 and 403,
+  per-product listing, cross-tenant refusals, create defaults, promotion and demotion through both routes,
+  the same value accepted in a second organization, validation rejections, the immutable-value 400, and
+  the delete lifecycle including the product left with no primary.
+- 17 DB integration tests against a provisioned PostgreSQL: exact storage, real audit rows, the
+  organization-wide unique key in both directions, single-primary invariants, explicit-null clearing,
+  cross-tenant and sibling-product refusals, product delete cascade, rollback of an insert and of a
+  promotion when the audit write fails, and audit visibility inside an ambient transaction.
+
+### Test Results
+
+Unit 336/336, e2e 188/188, DB 378/378. Build clean, oxlint with type-aware rules at zero warnings, and
+prettier clean. The 05.06 suites are 37 unit, 25 e2e, and 17 DB tests. Baseline before this task was 299
+unit, 163 e2e, and 361 DB.
+
+### Security Review
+
+The organization is read from `TenantContext` and is never accepted from the request body, so a caller
+cannot file a barcode against another tenant. Tenant scope is organization-only, matching the product: a
+barcode is a label on a product and is shared by every store, and `product_barcodes` has no store column.
+All five routes carry `products:manage` and `@RequireTenantScope()`; no new permission code was added to
+the catalog. A cross-tenant product id is reported as a missing product rather than forbidden, so
+existence is not disclosed across tenants. The value is bounded at 64 characters so an unbounded text
+key is refused at the edge, and a non-boolean primary flag is rejected by the DTO rather than coerced.
+No secrets are logged and no new dependency was added.
+
+### Scope Review
+
+Only 05.06 was implemented. No product, category, brand, unit, or tax behavior was changed; the product
+module is untouched apart from the `AppModule` import. No scan lookup, no offline catalog work, no
+pricing, and no stock behaviour were touched, and no unrelated module was refactored.
+
+### Tenant Isolation Review
+
+Two independent boundaries, both tested. The parent product is resolved in the caller organization before
+any barcode is read, so a foreign product id never reaches a barcode query. The barcode lookup is keyed
+on `id`, `productId`, and `organizationId` together, so a sibling product barcode inside the same tenant
+is not reachable by putting another product id in the path. The value-uniqueness lookup is deliberately
+organization-wide with no product predicate, because the conflicting row may belong to any product; a
+repository test asserts the product predicate is absent so it cannot be narrowed by accident.
+
+### Offline/Sync Review
+
+Not affected by this task. The Flutter local `product_barcodes` table and catalog sync are 05.09 and
+05.11 work. Two wire facts are recorded for those phases: a value is a verbatim string with no case
+normalization, so a Drift column must compare bytes rather than a folded value, and the primary flag is a
+single boolean per product, so the local rule must mirror the one-primary rule rather than storing a set.
+The catalog needs a barcode index for search (05.10); the server-side `@@index([barcode])` on
+`product_barcodes` exists but has no query behind it yet.
+
+### Database Review
+
+No migration. The existing `product_barcodes` table, its `@@unique([organizationId, barcode])`, its
+`@@index([barcode])` and `@@index([productId])`, the `CASCADE` on the product foreign key, and the
+`RESTRICT` on the organization foreign key were used as they stand. Two things remain unenforced at the
+database layer and are recorded in ASM-052 rather than fixed here: there is no partial unique index on
+`is_primary`, so the one-primary rule is a service rule, and there is no length limit on the `barcode`
+column, so the 64-character bound is a DTO rule.
+
+### Findings and Fixes
+
+None in the new code. Two mistakes in the new tests were found and fixed before commit: an early e2e case
+reused one barcode value across two create cases, so the second create hit the organization-unique
+constraint and failed for the wrong reason, and a case intended to show that a sibling product barcode is
+unreachable used a mock that ignored its arguments and so appeared to succeed. A claim in a service
+comment that a malformed `productId` is rejected by the global validation pipe was also false, because
+the pipe validates the body and not path parameters; the comment was corrected to state the actual
+behaviour, which matches the product, category, brand, unit, and conversion routes.
+
+### Self-Audit Against AGENTS.md
+
+Requirements met for 05.06 only. Architecture unchanged: controller, service, repository, Prisma, and
+`BarcodesModule` imports `ProductsModule` for its exported `ProductRepository` rather than repeating the
+product lookup. Database unchanged, no migration, no destructive operation. Security: tenant from the
+principal, permission-gated, cross-tenant and sibling-product refusals. Business rules: the five undefined
+rules were asked of the user rather than invented, and no tax, accounting, or compliance behavior was
+implied. Offline/sync: out of scope, wire facts recorded. Testing: 37 unit, 25 e2e, 17 DB. Scope: no
+unrelated refactor; the shared product controller is still registered through the same module graph.
+Documentation: ASM-052 and CURRENT_STATE updated.
+
+### Assumptions
+
+ASM-052. Nested routes under the product; at most one primary with optional status and auto-demotion;
+value immutable after creation; free-text values with a length bound rather than a digit pattern; scan
+lookup deferred to 05.10 and 08.03; and `products:manage` with organization-only tenant scope.
+
+### Unresolved Issues
+
+None introduced by this task. The one-primary rule and the value length bound are service-level only, and
+the lost-race window on the value pre-check is the same shape as the SKU, brand, unit, and conversion
+checks, which is recorded in Pending Decisions 10 for a future migration. ASM-046, the corrupted encoding
+in three brain documents, remains open and was deliberately not repaired; all three documents were edited
+by byte-level splicing and this entry is ASCII, so no new corruption was added.
+
+### Architectural Changes
+
+None. `BarcodesModule` follows the established catalog module pattern.
+
+### Next Available Task
+
+Task 05.07 per `plans/05_PRODUCTS.md`.
