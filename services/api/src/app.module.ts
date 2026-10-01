@@ -21,6 +21,7 @@ import { CategoriesModule } from './categories/categories.module.js';
 import { BrandsModule } from './brands/brands.module.js';
 import { UnitsModule } from './units/units.module.js';
 import { UnitConversionsModule } from './unit-conversions/unit-conversions.module.js';
+import { ProductsModule } from './products/products.module.js';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { UnitConversionsModule } from './unit-conversions/unit-conversions.modul
     BrandsModule,
     UnitsModule,
     UnitConversionsModule,
+    ProductsModule,
     AuditModule,
     IdempotencyModule,
   ],

@@ -4124,4 +4124,154 @@ unit endpoints it depends on for reference counts are registered in the same app
 
 ### Next Available Task
 
-Task 05.05 per `plans/05_PRODUCTS.md`.
+Task 05.05 per `plans/05_PRODUCTS.md`.### Task 05.05 - Product Master
+
+Date: 2026-10-01
+Phase: 05 Products
+Agent: opencode
+Status: complete
+
+### Requested Work
+
+TASK 05.05 of `plans/05_PRODUCTS.md`: organization-scoped product master CRUD. Barcodes were deliberately
+left to 05.06, so no barcode is created, updated, or scanned here and `product_barcodes` is reached only
+through the delete guard.
+
+### Files Created
+
+- `src/products/product.repository.ts` - the interface, mirroring the category, brand, and unit modules.
+- `src/products/prisma-product.repository.ts` - organization-scoped reads, the sort allow-list, and the
+  four parent joins.
+- `src/products/product.service.ts` - SKU conflict detection, parent organization checks, the guarded
+  delete, and the audit writes.
+- `src/products/product.controller.ts` - the six routes.
+- `src/products/products.module.ts` - imports `CategoriesModule`, `BrandsModule`, and `UnitsModule` for
+  their exported repositories only.
+- `src/products/dto/create-product.dto.ts`
+- `src/products/dto/update-product.dto.ts`
+- `src/products/dto/product-query.dto.ts`
+- `src/products/dto/product-response.dto.ts`
+- `src/products/product.service.spec.ts` - 53 unit tests.
+- `src/products/prisma-product.repository.spec.ts` - 16 unit tests.
+- `test/products.e2e-spec.ts` - 34 e2e tests.
+- `test/db/product-service.integration.spec.ts` - 17 tests against real PostgreSQL.
+
+### Files Modified
+
+- `src/app.module.ts` - registers `ProductsModule`.
+- `brain/ASSUMPTIONS.md` - ASM-051 appended.
+- `brain/CURRENT_STATE.md` - routes, pending decision, last audit, last updated.
+- `brain/AUDIT_LOG.md` - this entry.
+
+### Files Deleted
+
+None.
+
+### Findings and Fixes
+
+1. High. The delete guard counted nine of the ten `RESTRICT` child tables and omitted `productBatch`, so a
+   product whose only remaining child rows were batch rows would have passed the guard and reached the
+   database, which would have answered with a raw foreign key error instead of the actionable deactivate
+   instruction. Neither the unit suite nor the e2e suite could have found this, because both drive a fake
+   whose history counts the test itself supplies; the database integration test, which inserts a real
+   batch row with no balance and no movement, is what exposed it. Fixed by adding the count and a test in
+   all three suites.
+2. The e2e fake returned a hand-rolled decimal that echoed the stored scale, and the product DTOs had been
+   written to match it, claiming that `60.00` is returned as `"60.00"`. Prisma's `Decimal` serializes
+   through `toString()`, which normalizes trailing zeros, so the real wire value is `"60"` and
+   `10.000` is `"10"`. The fake now uses the real `Decimal` on every read, and the DTO text was
+   corrected to say the value is exact while the stored scale is not echoed, rather than weakening the
+   assertion to fit the fake.
+3. The first product service spec asserted that the tax category lookup is called with positional
+   arguments. It is reached through the Prisma delegate, because no tax category repository exists until
+   05.07, so the organization filter lives in the `where` clause. The assertion was wrong, not the code.
+4. The first version of the ambient-transaction spec passed a bare `{ product: {} }` as the caller
+   transaction. The service resolves `tx ?? prisma.client` before counting, so the counts must exist on
+   whichever client is supplied. The factory now builds one fully populated transaction and the tests
+   use it.
+5. Two e2e tests asserted error codes that the module never produced: a cross-tenant parent is a
+   `BadRequestException` and therefore `BAD_REQUEST`, not `VALIDATION_FAILED`. Corrected to match the
+   deliberate design that an unresolvable reference is indistinguishable from one that does not exist.
+6. An e2e test requested `/api/docs-json`. No `SwaggerModule.setup` call exists in this codebase; the
+   Swagger decorators are metadata only. The test was removed rather than the endpoint being invented.
+7. The e2e fake originally short-circuited its `where` matcher on `organizationId`, so a `search` filter
+   was ignored and every SKU lookup matched any row in the organization, which made unrelated creates
+   report a spurious conflict. The matcher now applies the organization and the `OR` alternation together,
+   the way the repository builds the clause.
+
+### Business Rules Verified
+
+- BR-040: every optional parent is checked against `TenantContext.organizationId` in the service, because
+  the four foreign keys only check that the row exists. A database test writes a cross-tenant parent
+  through Prisma to show the foreign key would otherwise have accepted it.
+- Organization scope is taken from the authenticated principal only; a body-supplied `organizationId` is
+  rejected by the validation pipe, and a cross-tenant read, update, deactivate, or delete is reported as
+  not found rather than forbidden.
+- The SKU is unique per organization by an existing database constraint, and is stored exactly as
+  supplied. The same SKU in two organizations is accepted; a duplicate in one is a 409.
+- AGENTS.md 15: no hard delete is permitted once anything has recorded the product. Ten `RESTRICT` child
+  tables are counted and the caller is told to deactivate instead. `product_barcodes` cascades and is
+  not counted, proven by a database test that deletes a product holding a barcode.
+- AGENTS.md 24: no tax rate is hardcoded or read onto a product row. The tax category is a reference
+  only, and the e2e suite asserts the joined object has no `rate` field.
+- AGENTS.md 14: no stock quantity is selected onto a product row, and the list carries no reference
+  count, because inventory is a ledger projection.
+- AGENTS.md 25: create, update, deactivate, and delete each write an audit record in the same
+  transaction. A database test makes the audit write fail and asserts the product insert was rolled
+  back; another test passes a caller-supplied transaction and asserts the audit row is visible inside
+  it, which it would not be had the service opened a second transaction.
+
+### Security
+
+- All six routes require `products:manage` and `@RequireTenantScope()`. The unused
+  `products:create`, `products:update`, and `products:deactivate` codes stay unassigned (ASM-051).
+- `sortBy` is restricted to an allow-list, so a client cannot hand Prisma `organizationId` and order
+  rows by tenant. A unit test and an e2e test both cover the fallback.
+- Decimal input patterns admit no sign and no exponent notation, so a negative price and a value beyond
+  the stored scale are refused at the edge rather than truncated by the column.
+- No secret, token, or password is logged or persisted by this module, and the organization is never
+  taken from the request.
+
+### Offline and Sync
+
+Not in scope. The wire format is the contract the offline catalog sync in 05.09 and 05.11 will consume:
+money and quantity are exact decimal strings, the list is paged with a total, and every read is bounded
+to one organization. No `operationId` or idempotency key is defined for products here, because a product
+write is not a business transaction that the POS replays offline; the offline catalog is read-only in
+this phase.
+
+### Testing
+
+299 unit, 163 e2e, and 361 DB tests pass. Build, oxlint with type-aware rules at zero warnings, and
+prettier are clean. Baseline before this task was 230 unit, 129 e2e, 344 DB.
+
+### Self-Audit Against AGENTS.md
+
+Requirements met for 05.05 only; barcodes are untouched. Architecture unchanged: controller, service,
+repository, Prisma, and `ProductsModule` imports the three sibling catalog modules for their exported
+repositories rather than duplicating their lookups. Database unchanged, no migration, no destructive
+operation. Security, business rules, and audit coverage are listed above. Documentation updated in all
+three brain documents.
+
+### Assumptions
+
+ASM-051. One permission code for all six product routes; a guarded hard delete with deactivation as the
+escape; all four parents optional but organization-checked when supplied; prices and reorder values zero
+or greater; SKU stored verbatim with a non-unique name; no reference count or category, brand, and unit
+filters on the list; and the decimal wire form carrying an exact value without the stored scale.
+
+### Unresolved Issues
+
+None introduced by this task. The service-level organization check on each parent has no database
+constraint behind it, which is recorded in Pending Decisions 9 for a future migration. ASM-046, the
+corrupted encoding in three brain documents, remains open and was deliberately not repaired; all three
+documents were edited by byte-level splicing and this entry is ASCII, so no new corruption was added.
+
+### Architectural Changes
+
+None. `ProductsModule` follows the established catalog module pattern.
+
+### Next Available Task
+
+Task 05.06 per `plans/05_PRODUCTS.md`.
+

@@ -519,3 +519,25 @@ Impact: A user who wants the same relationship in both directions must create tw
 Status: active - revisit if a deactivation rule, a maximum graph depth, or a database-level constraint is ever documented.
 
 Resolution:
+
+## ASM-051
+
+Date: 2026-10-01
+Task: 05.05 - Product Master
+Assumption: The following product rules were decided by the user because no brain document defines them, and are recorded here rather than treated as engineering defaults.
+
+1. Every product route requires `products:manage`. The catalog also defines `products:create`, `products:update` and `products:deactivate`, and all three are left unused: making the product master the only catalog entity with split read and write permissions is a business-rule change, and a permission code is exactly that.
+2. `DELETE /api/v1/products/:id` is exposed and guarded. Any recorded history turns the delete into a 400 that instructs the caller to deactivate instead. A product with no history is hard-deleted, which is safe because the guarded child tables are empty and `product_barcodes` cascades.
+3. `categoryId`, `brandId`, `unitId` and `taxCategoryId` are all optional. A supplied reference must belong to the caller's own organization; the four foreign keys only check that the parent row exists, so the service check is the only barrier (BR-040). A cross-tenant or unknown reference is reported as an unusable input, not as a forbidden one, so existence is not disclosed across tenants.
+4. Prices and reorder values are zero or greater. Zero is allowed, because a zero default price or a zero reorder threshold is a legitimate instruction, and a sign is refused at the edge rather than left to the column.
+5. The SKU is stored exactly as supplied with no case normalization, and the name is not unique. The organization-plus-SKU unique index is the only natural key a product has; a mini-mart legitimately stocks the same drink in several sizes.
+6. The product list carries no reference counts and no stock quantity. Inventory is a ledger projection and must never be read off a product row (AGENTS.md 14), and the ten child tables that block a delete are all owned by later phases.
+7. On the wire, money and quantity are exact decimal strings, but the stored scale is not echoed. Prisma's `Decimal` serializes through `toString()`, which normalizes trailing zeros, so `60.00` arrives as `"60"` and `10.000` as `"10"`. The value is exact; a client that needs a fixed number of decimals formats for display. An earlier draft of the DTO documentation promised the stored scale and was corrected once the e2e fake was replaced with the real Prisma `Decimal`.
+8. The list supports `search` over name and SKU, a `status` filter, pagination, and `sortBy` restricted to `createdAt`, `updatedAt`, `name`, `sku` and `status`. Anything else falls back to the default rather than reaching Prisma, because `sortBy` is otherwise an attacker-controlled key and `organizationId` would let a caller order rows by tenant. No category, brand or unit filter is exposed in this task.
+9. Create always writes `status: active`; `PUT /:id/deactivate` writes `inactive`; a plain update may also set either value, which is how a deactivated product is brought back.
+
+Reason: AGENTS.md section 5 forbids inventing business rules. Items 1 through 4 were put to the user as explicit choices. Items 5 through 9 are implementation decisions with no business-rule content, recorded so the next reader does not have to re-derive them from the code.
+
+Impact: A caller with `products:manage` can change every product field, so the separation of duties a shop owner may want is not available for products alone. The organization checks in item 3 exist only in the service, so any future write path that bypasses it could attach a product to a parent in another tenant. A product whose only child rows are batch rows is blocked from deletion by an explicit `productBatch` count; that count was missing from the first implementation of the guard and was found by a database test, because no unit or e2e fake would have surfaced it.
+
+Status: active - revisit if a per-store product scope, split create and update permissions, a reference count column, or a database-level cross-tenant parent constraint is ever documented.
