@@ -11,6 +11,7 @@ import { ProductRepository } from './product.repository.js';
 import { CategoryRepository } from '../categories/category.repository.js';
 import { BrandRepository } from '../brands/brand.repository.js';
 import { UnitRepository } from '../units/unit.repository.js';
+import { TaxCategoryRepository } from '../tax-categories/tax-category.repository.js';
 import { CreateProductDto } from './dto/create-product.dto.js';
 import { UpdateProductDto } from './dto/update-product.dto.js';
 import { ProductQueryDto } from './dto/product-query.dto.js';
@@ -41,6 +42,7 @@ export class ProductService {
     private readonly categoryRepository: CategoryRepository,
     private readonly brandRepository: BrandRepository,
     private readonly unitRepository: UnitRepository,
+    private readonly taxCategoryRepository: TaxCategoryRepository,
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
   ) {}
@@ -399,11 +401,12 @@ export class ProductService {
 
   /**
    * Builds the reference checks for whichever of the four optional parent ids
-   * the payload carries. `taxCategory` has no repository yet because tax
-   * category management is Task 05.07, so its lookup goes through the Prisma
-   * client directly; it must move onto a repository when 05.07 lands, or the
-   * tenant check on this column will be the only one in the module that bypasses
-   * the repository layer.
+   * the payload carries. All four go through a repository, so none of these
+   * tenant checks can drift apart from the others. A product's `taxCategoryId`
+   * is a reference only: no tax rate is read onto the product row, and the
+   * category's own status and effective window are deliberately not checked here
+   * because deciding which rate applies to a transaction belongs to Task 14.03
+   * (ASM-053).
    */
   private referencesFrom(dto: {
     categoryId?: string | null;
@@ -437,10 +440,12 @@ export class ProductService {
       {
         field: 'taxCategoryId',
         id: dto.taxCategoryId,
-        lookup: (id, organizationId, lookupTx) =>
-          (lookupTx ?? this.prisma.client).taxCategory.findFirst({
-            where: { id, organizationId },
-          }),
+        lookup: (id, organizationId, tx) =>
+          this.taxCategoryRepository.findByIdInOrganization(
+            id,
+            organizationId,
+            tx,
+          ),
       },
     ];
   }

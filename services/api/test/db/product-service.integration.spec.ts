@@ -14,6 +14,7 @@ import { PrismaProductRepository } from '../../src/products/prisma-product.repos
 import { PrismaCategoryRepository } from '../../src/categories/prisma-category.repository.js';
 import { PrismaBrandRepository } from '../../src/brands/prisma-brand.repository.js';
 import { PrismaUnitRepository } from '../../src/units/prisma-unit.repository.js';
+import { PrismaTaxCategoryRepository } from '../../src/tax-categories/prisma-tax-category.repository.js';
 import { ProductService } from '../../src/products/product.service.js';
 import { provisionTestDatabase } from './db-test-db.helper.js';
 
@@ -51,6 +52,7 @@ beforeAll(async () => {
     new PrismaCategoryRepository(prismaService),
     new PrismaBrandRepository(prismaService),
     new PrismaUnitRepository(prismaService),
+    new PrismaTaxCategoryRepository(prismaService),
     prismaService,
     auditService,
   );
@@ -390,6 +392,7 @@ describe('ProductService against PostgreSQL', () => {
       new PrismaCategoryRepository(prismaService),
       new PrismaBrandRepository(prismaService),
       new PrismaUnitRepository(prismaService),
+      new PrismaTaxCategoryRepository(prismaService),
       prismaService,
       failing,
     );

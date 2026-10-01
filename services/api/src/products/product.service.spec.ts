@@ -11,6 +11,7 @@ import type { ProductRepository } from './product.repository.js';
 import type { CategoryRepository } from '../../categories/category.repository.js';
 import type { BrandRepository } from '../../brands/brand.repository.js';
 import type { UnitRepository } from '../../units/unit.repository.js';
+import type { TaxCategoryRepository } from '../../tax-categories/tax-category.repository.js';
 import { ProductService } from './product.service.js';
 
 const ORG_ID = '11111111-1111-4111-8111-111111111111';
@@ -125,6 +126,9 @@ function createService(
   const unitRepository = {
     findByIdInOrganization: unitLookup,
   } as unknown as UnitRepository;
+  const taxCategoryRepository = {
+    findByIdInOrganization: taxLookup,
+  } as unknown as TaxCategoryRepository;
 
   const audit = {
     record: overrides.record ?? vi.fn().mockResolvedValue({}),
@@ -165,7 +169,6 @@ function createService(
 
   const prisma = {
     client: {
-      taxCategory: { findFirst: taxLookup },
       saleItem: { count: saleItemCount },
       saleReturnItem: { count: saleReturnItemCount },
       productBatch: { count: productBatchCount },
@@ -193,6 +196,7 @@ function createService(
       categoryRepository,
       brandRepository,
       unitRepository,
+      taxCategoryRepository,
       prisma,
       audit,
     ),
@@ -361,12 +365,14 @@ describe('ProductService.create', () => {
     );
     expect(lookups.brand).toHaveBeenCalledWith(BRAND_ID, ORG_ID, undefined);
     expect(lookups.unit).toHaveBeenCalledWith(UNIT_ID, ORG_ID, undefined);
-    // The tax category has no repository until Task 05.07, so it is reached
-    // through the Prisma delegate and the organization filter lives in the
-    // where clause rather than in positional arguments.
-    expect(lookups.taxCategory).toHaveBeenCalledWith({
-      where: { id: TAX_CATEGORY_ID, organizationId: ORG_ID },
-    });
+    // The tax category lookup now goes through its own repository like the
+    // other three, so all four pass the organization as a positional argument
+    // rather than inside a Prisma where clause.
+    expect(lookups.taxCategory).toHaveBeenCalledWith(
+      TAX_CATEGORY_ID,
+      ORG_ID,
+      undefined,
+    );
   });
 
   it('refuses a category from another organization', async () => {

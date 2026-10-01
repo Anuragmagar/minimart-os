@@ -4448,3 +4448,161 @@ None. `BarcodesModule` follows the established catalog module pattern.
 ### Next Available Task
 
 Task 05.07 per `plans/05_PRODUCTS.md`.
+## 2026-10-01 - Task 05.07 - Tax Categories
+
+### Task
+
+TASK 05.07 - Tax Categories, from `plans/05_PRODUCTS.md`. Objective: tax configuration. Status: complete.
+
+### Summary
+
+Added organization-scoped management of the existing `TaxCategory` model. No migration was
+required: the model, its `TaxCategoryStatus` enum, the `@@unique([organizationId, code])`
+constraint, and the `products.tax_category_id` RESTRICT reference were all already in the schema
+from the 01.04 product migration. The task delivers configuration only and computes no tax
+anywhere, because AGENTS.md section 24 requires tax behavior to be data-driven and forbids
+hardcoding rates into business logic.
+
+New module `services/api/src/tax-categories`: `TaxCategoryRepository` contract,
+`PrismaTaxCategoryRepository`, `TaxCategoryService`, `TaxCategoryController`,
+`TaxCategoriesModule`, and four DTOs. `TaxCategoriesModule` is registered in `AppModule`.
+`ProductsModule` now imports it and re-exports the repository, and `ProductService` takes a
+`TaxCategoryRepository` in place of the direct Prisma lookup it used for `taxCategoryId`, so all
+four optional product parents are resolved the same way.
+
+Routes, all under `/api/v1/tax-categories`, all requiring `products:manage` and carrying
+`@RequireTenantScope()`: `GET` (paged, `search` over name or code, `status` filter, sort
+allow-list, product reference count per row), `GET /:id`, `POST`, `PUT /:id`, `PUT
+/:id/deactivate`, `DELETE /:id`.
+
+Business rules applied. The rate is any non-negative value that fits `NUMERIC(14,4)`, at most 10
+integer digits and 4 decimal places, with no business cap: zero, a rate above 100, and a
+four-decimal rate are all accepted, while a negative value and exponent notation such as `1e-7` are
+refused. A rate change edits the row in place rather than superseding it, and both the rate and the
+effective window are editable. `effectiveFrom` is required and may be past or future, `effectiveTo`
+is nullable for an open-ended rate, and a supplied end must be strictly later than the start; the
+window is validated on every update against the merged result, so a patch that moves only
+`effectiveFrom` cannot leave the stored `effectiveTo` behind it. The `code` is mutable and unique
+per organization. A product may be pointed at any tax category with no status or window check, since
+that decision belongs to Task 14.03.
+
+### Files Created
+
+- `services/api/src/tax-categories/tax-category.repository.ts`
+- `services/api/src/tax-categories/prisma-tax-category.repository.ts`
+- `services/api/src/tax-categories/tax-category.service.ts`
+- `services/api/src/tax-categories/tax-category.controller.ts`
+- `services/api/src/tax-categories/tax-categories.module.ts`
+- `services/api/src/tax-categories/dto/create-tax-category.dto.ts`
+- `services/api/src/tax-categories/dto/update-tax-category.dto.ts`
+- `services/api/src/tax-categories/dto/tax-category-query.dto.ts`
+- `services/api/src/tax-categories/dto/tax-category-response.dto.ts`
+- `services/api/src/tax-categories/tax-category.service.spec.ts`
+- `services/api/src/tax-categories/prisma-tax-category.repository.spec.ts`
+- `services/api/test/tax-categories.e2e-spec.ts`
+- `services/api/test/db/tax-category-service.integration.spec.ts`
+
+### Files Modified
+
+- `services/api/src/app.module.ts` (register `TaxCategoriesModule`)
+- `services/api/src/products/products.module.ts` (import and re-export the tax category module)
+- `services/api/src/products/product.service.ts` (tax category parent resolved through the
+  repository; stale comment deferring this to 05.07 removed)
+- `services/api/src/products/product.service.spec.ts` (constructor and lookup assertions updated)
+- `services/api/test/db/product-service.integration.spec.ts` (constructor wiring updated)
+- `brain/ASSUMPTIONS.md` (ASM-053 appended)
+- `brain/CURRENT_STATE.md` (routes, permissions, testing counts, pending decision 11, last audit,
+  last updated)
+- `brain/AUDIT_LOG.md` (this entry)
+
+### Files Deleted
+
+None.
+
+### Business Rules Verified
+
+- BR-036: tax behavior is effective-dated and configurable. Each row carries `effectiveFrom` and a
+  nullable `effectiveTo`, an open-ended rate is the normal case, and the ordering of a window is
+  enforced on every write.
+- ASM-015: organization-scoped, code-unique, effective-dated, auditable tax categories, with a rate
+  change as an auditable in-place edit.
+- BR-008 / AGENTS.md section 15: a posted record is not rewritten. A rate change is audited with
+  before and after images rather than silently overwritten, and deactivating a category leaves its
+  rate readable for history.
+- AGENTS.md section 24: no tax rate is hardcoded into business logic anywhere in this task. The only
+  rate the code writes is the one an operator configured, and nothing computes from it.
+- AGENTS.md section 13: authorization scope is derived server-side. The organization comes from the
+  authenticated principal, and the list, single read, code pre-check, and product reference count are
+  all keyed on it. A cross-tenant id is reported as missing rather than forbidden, so existence is
+  not disclosed across tenants.
+- AGENTS.md sections 21 and 25: each business write and its audit record share one transaction, so a
+  failed audit rolls the business write back. Verified by a database test for create, update, and
+  delete.
+
+### Tests Run
+
+- `npm run build`
+- `npm run format:check`
+- `npx oxlint --type-aware src/ test/`
+- `npx vitest run` (unit)
+- `npx vitest run --config vitest.config.e2e.ts` (e2e)
+- `npx vitest run --config vitest.config.db.ts` (real PostgreSQL)
+
+### Test Results
+
+Unit 379/379, e2e 225/225, DB integration 404/404, all passing. Build clean, oxlint 0 warnings,
+prettier clean. Task 05.07 added 43 unit tests, 37 e2e tests, and 26 DB integration tests; the
+product suites were updated for the new constructor argument and still pass at 34 e2e and the
+existing DB count.
+
+Two defects were found by the tests rather than by review, and both were in the tests. The e2e fake
+returned `effectiveFrom` and `effectiveTo` as strings while the service correctly compares the
+window as timestamps, so every update returned 500 until the fake was changed to return `Date`
+objects the way Prisma does. The DB listing test asserted that an inactive filter returned exactly
+one row, which was wrong once an earlier case had also deactivated a category, so it now asserts
+containment instead.
+
+### Security
+
+Every route requires `products:manage` and fails closed without it; an e2e case confirms a caller
+holding only `sales:create` gets 403. No new permission code was added, so the catalog stays at its
+existing size and `brain/SECURITY.md`, the seed, and the guards are unchanged. No client-supplied
+organization or store id is trusted: the create DTO does not carry `organizationId`, and a payload
+carrying one is refused by the global validation pipe. The rate is validated as a decimal string
+rather than a float, and no rate is computed. No secrets were added and no logging of credentials
+was introduced.
+
+### Offline/Sync
+
+Out of scope for this task; the task is backend configuration only. The rate being a plain
+organization-scoped row is a fact recorded for the offline catalog work in 05.09 to 05.12, and
+nothing here changes the wire shape of an existing operation.
+
+### Assumptions
+
+ASM-053, covering the five rules that no brain document defines: the rate bounds with no business
+cap, the in-place rate edit, the effective-window semantics including the open-ended null, the
+mutable organization-scoped code, and the deliberate absence of a status or window check on product
+assignment. Each was put to the user as an explicit choice rather than invented. Also applied:
+ASM-048 and ASM-051, reusing `products:manage` rather than adding a code.
+
+### Unresolved Issues
+
+None introduced. Two service-level limits are recorded in Pending Decisions 11 for a future
+migration rather than fixed here: the rate bounds are a DTO pattern and not a database `CHECK`, and
+the code uniqueness pre-check loses a race as a `P2002` rather than a 409, which is the same shape
+as the SKU, brand, unit, and barcode checks. Because a rate is edited in place, the audit log is the
+only place a superseded rate survives, so a rate change is not safe to perform without its audit
+record. ASM-046, the corrupted encoding in three brain documents, remains open and was deliberately
+not repaired; all three documents were edited by byte-level splicing and this entry is ASCII, so no
+new corruption was added.
+
+### Architectural Changes
+
+None. `TaxCategoriesModule` follows the established catalog module pattern. The one structural
+change is that the product module now depends on the tax category module for its repository, which
+removes a direct Prisma reach-through from the product write path rather than adding a new layer.
+
+### Next Available Task
+
+Task 05.08 per `plans/05_PRODUCTS.md`.
