@@ -6393,6 +6393,486 @@ class ProductPricesCompanion extends UpdateCompanion<ProductPrice> {
   }
 }
 
+class $UnitConversionsTable extends UnitConversions
+    with TableInfo<$UnitConversionsTable, UnitConversion> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $UnitConversionsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _organizationIdMeta = const VerificationMeta(
+    'organizationId',
+  );
+  @override
+  late final GeneratedColumn<String> organizationId = GeneratedColumn<String>(
+    'organization_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _fromUnitIdMeta = const VerificationMeta(
+    'fromUnitId',
+  );
+  @override
+  late final GeneratedColumn<String> fromUnitId = GeneratedColumn<String>(
+    'from_unit_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _toUnitIdMeta = const VerificationMeta(
+    'toUnitId',
+  );
+  @override
+  late final GeneratedColumn<String> toUnitId = GeneratedColumn<String>(
+    'to_unit_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<Decimal, int> multiplier =
+      GeneratedColumn<int>(
+        'multiplier',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: true,
+      ).withConverter<Decimal>($UnitConversionsTable.$convertermultiplier);
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    organizationId,
+    fromUnitId,
+    toUnitId,
+    multiplier,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'unit_conversions';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<UnitConversion> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('organization_id')) {
+      context.handle(
+        _organizationIdMeta,
+        organizationId.isAcceptableOrUnknown(
+          data['organization_id']!,
+          _organizationIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_organizationIdMeta);
+    }
+    if (data.containsKey('from_unit_id')) {
+      context.handle(
+        _fromUnitIdMeta,
+        fromUnitId.isAcceptableOrUnknown(
+          data['from_unit_id']!,
+          _fromUnitIdMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_fromUnitIdMeta);
+    }
+    if (data.containsKey('to_unit_id')) {
+      context.handle(
+        _toUnitIdMeta,
+        toUnitId.isAcceptableOrUnknown(data['to_unit_id']!, _toUnitIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_toUnitIdMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMeta);
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_updatedAtMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {organizationId, fromUnitId, toUnitId},
+  ];
+  @override
+  UnitConversion map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return UnitConversion(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      organizationId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}organization_id'],
+      )!,
+      fromUnitId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}from_unit_id'],
+      )!,
+      toUnitId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}to_unit_id'],
+      )!,
+      multiplier: $UnitConversionsTable.$convertermultiplier.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.int,
+          data['${effectivePrefix}multiplier'],
+        )!,
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $UnitConversionsTable createAlias(String alias) {
+    return $UnitConversionsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<Decimal, int> $convertermultiplier = decimal6;
+}
+
+class UnitConversion extends DataClass implements Insertable<UnitConversion> {
+  final String id;
+  final String organizationId;
+  final String fromUnitId;
+  final String toUnitId;
+  final Decimal multiplier;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const UnitConversion({
+    required this.id,
+    required this.organizationId,
+    required this.fromUnitId,
+    required this.toUnitId,
+    required this.multiplier,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['organization_id'] = Variable<String>(organizationId);
+    map['from_unit_id'] = Variable<String>(fromUnitId);
+    map['to_unit_id'] = Variable<String>(toUnitId);
+    {
+      map['multiplier'] = Variable<int>(
+        $UnitConversionsTable.$convertermultiplier.toSql(multiplier),
+      );
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  UnitConversionsCompanion toCompanion(bool nullToAbsent) {
+    return UnitConversionsCompanion(
+      id: Value(id),
+      organizationId: Value(organizationId),
+      fromUnitId: Value(fromUnitId),
+      toUnitId: Value(toUnitId),
+      multiplier: Value(multiplier),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory UnitConversion.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return UnitConversion(
+      id: serializer.fromJson<String>(json['id']),
+      organizationId: serializer.fromJson<String>(json['organizationId']),
+      fromUnitId: serializer.fromJson<String>(json['fromUnitId']),
+      toUnitId: serializer.fromJson<String>(json['toUnitId']),
+      multiplier: serializer.fromJson<Decimal>(json['multiplier']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'organizationId': serializer.toJson<String>(organizationId),
+      'fromUnitId': serializer.toJson<String>(fromUnitId),
+      'toUnitId': serializer.toJson<String>(toUnitId),
+      'multiplier': serializer.toJson<Decimal>(multiplier),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  UnitConversion copyWith({
+    String? id,
+    String? organizationId,
+    String? fromUnitId,
+    String? toUnitId,
+    Decimal? multiplier,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => UnitConversion(
+    id: id ?? this.id,
+    organizationId: organizationId ?? this.organizationId,
+    fromUnitId: fromUnitId ?? this.fromUnitId,
+    toUnitId: toUnitId ?? this.toUnitId,
+    multiplier: multiplier ?? this.multiplier,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  UnitConversion copyWithCompanion(UnitConversionsCompanion data) {
+    return UnitConversion(
+      id: data.id.present ? data.id.value : this.id,
+      organizationId: data.organizationId.present
+          ? data.organizationId.value
+          : this.organizationId,
+      fromUnitId: data.fromUnitId.present
+          ? data.fromUnitId.value
+          : this.fromUnitId,
+      toUnitId: data.toUnitId.present ? data.toUnitId.value : this.toUnitId,
+      multiplier: data.multiplier.present
+          ? data.multiplier.value
+          : this.multiplier,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('UnitConversion(')
+          ..write('id: $id, ')
+          ..write('organizationId: $organizationId, ')
+          ..write('fromUnitId: $fromUnitId, ')
+          ..write('toUnitId: $toUnitId, ')
+          ..write('multiplier: $multiplier, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    organizationId,
+    fromUnitId,
+    toUnitId,
+    multiplier,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is UnitConversion &&
+          other.id == this.id &&
+          other.organizationId == this.organizationId &&
+          other.fromUnitId == this.fromUnitId &&
+          other.toUnitId == this.toUnitId &&
+          other.multiplier == this.multiplier &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class UnitConversionsCompanion extends UpdateCompanion<UnitConversion> {
+  final Value<String> id;
+  final Value<String> organizationId;
+  final Value<String> fromUnitId;
+  final Value<String> toUnitId;
+  final Value<Decimal> multiplier;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const UnitConversionsCompanion({
+    this.id = const Value.absent(),
+    this.organizationId = const Value.absent(),
+    this.fromUnitId = const Value.absent(),
+    this.toUnitId = const Value.absent(),
+    this.multiplier = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  UnitConversionsCompanion.insert({
+    required String id,
+    required String organizationId,
+    required String fromUnitId,
+    required String toUnitId,
+    required Decimal multiplier,
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       organizationId = Value(organizationId),
+       fromUnitId = Value(fromUnitId),
+       toUnitId = Value(toUnitId),
+       multiplier = Value(multiplier),
+       createdAt = Value(createdAt),
+       updatedAt = Value(updatedAt);
+  static Insertable<UnitConversion> custom({
+    Expression<String>? id,
+    Expression<String>? organizationId,
+    Expression<String>? fromUnitId,
+    Expression<String>? toUnitId,
+    Expression<int>? multiplier,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (organizationId != null) 'organization_id': organizationId,
+      if (fromUnitId != null) 'from_unit_id': fromUnitId,
+      if (toUnitId != null) 'to_unit_id': toUnitId,
+      if (multiplier != null) 'multiplier': multiplier,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  UnitConversionsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? organizationId,
+    Value<String>? fromUnitId,
+    Value<String>? toUnitId,
+    Value<Decimal>? multiplier,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return UnitConversionsCompanion(
+      id: id ?? this.id,
+      organizationId: organizationId ?? this.organizationId,
+      fromUnitId: fromUnitId ?? this.fromUnitId,
+      toUnitId: toUnitId ?? this.toUnitId,
+      multiplier: multiplier ?? this.multiplier,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (organizationId.present) {
+      map['organization_id'] = Variable<String>(organizationId.value);
+    }
+    if (fromUnitId.present) {
+      map['from_unit_id'] = Variable<String>(fromUnitId.value);
+    }
+    if (toUnitId.present) {
+      map['to_unit_id'] = Variable<String>(toUnitId.value);
+    }
+    if (multiplier.present) {
+      map['multiplier'] = Variable<int>(
+        $UnitConversionsTable.$convertermultiplier.toSql(multiplier.value),
+      );
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('UnitConversionsCompanion(')
+          ..write('id: $id, ')
+          ..write('organizationId: $organizationId, ')
+          ..write('fromUnitId: $fromUnitId, ')
+          ..write('toUnitId: $toUnitId, ')
+          ..write('multiplier: $multiplier, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $InventoryLocationsTable extends InventoryLocations
     with TableInfo<$InventoryLocationsTable, InventoryLocation> {
   @override
@@ -10136,6 +10616,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     this,
   );
   late final $ProductPricesTable productPrices = $ProductPricesTable(this);
+  late final $UnitConversionsTable unitConversions = $UnitConversionsTable(
+    this,
+  );
   late final $InventoryLocationsTable inventoryLocations =
       $InventoryLocationsTable(this);
   late final $ProductBatchesTable productBatches = $ProductBatchesTable(this);
@@ -10145,6 +10628,26 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       $InventoryMovementsTable(this);
   late final $CustomersTable customers = $CustomersTable(this);
   late final $SyncOperationsTable syncOperations = $SyncOperationsTable(this);
+  late final Index productBarcodesBarcode = Index(
+    'product_barcodes_barcode',
+    'CREATE INDEX product_barcodes_barcode ON product_barcodes (barcode)',
+  );
+  late final Index productBarcodesProduct = Index(
+    'product_barcodes_product',
+    'CREATE INDEX product_barcodes_product ON product_barcodes (product_id)',
+  );
+  late final Index productPricesProductTypeFrom = Index(
+    'product_prices_product_type_from',
+    'CREATE INDEX product_prices_product_type_from ON product_prices (product_id, price_type, effective_from)',
+  );
+  late final Index unitConversionsFromTo = Index(
+    'unit_conversions_from_to',
+    'CREATE INDEX unit_conversions_from_to ON unit_conversions (from_unit_id, to_unit_id)',
+  );
+  late final Index unitConversionsToUnit = Index(
+    'unit_conversions_to_unit',
+    'CREATE INDEX unit_conversions_to_unit ON unit_conversions (to_unit_id)',
+  );
   late final Index batchesProductExpiry = Index(
     'batches_product_expiry',
     'CREATE INDEX batches_product_expiry ON product_batches (product_id, expiry_date)',
@@ -10189,12 +10692,18 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     products,
     productBarcodes,
     productPrices,
+    unitConversions,
     inventoryLocations,
     productBatches,
     inventoryBalances,
     inventoryMovements,
     customers,
     syncOperations,
+    productBarcodesBarcode,
+    productBarcodesProduct,
+    productPricesProductTypeFrom,
+    unitConversionsFromTo,
+    unitConversionsToUnit,
     batchesProductExpiry,
     balancesLocationProductBatch,
     movementsOrganizationOccurred,
@@ -13409,6 +13918,267 @@ typedef $$ProductPricesTableProcessedTableManager =
       ProductPrice,
       PrefetchHooks Function()
     >;
+typedef $$UnitConversionsTableCreateCompanionBuilder =
+    UnitConversionsCompanion Function({
+      required String id,
+      required String organizationId,
+      required String fromUnitId,
+      required String toUnitId,
+      required Decimal multiplier,
+      required DateTime createdAt,
+      required DateTime updatedAt,
+      Value<int> rowid,
+    });
+typedef $$UnitConversionsTableUpdateCompanionBuilder =
+    UnitConversionsCompanion Function({
+      Value<String> id,
+      Value<String> organizationId,
+      Value<String> fromUnitId,
+      Value<String> toUnitId,
+      Value<Decimal> multiplier,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$UnitConversionsTableFilterComposer
+    extends Composer<_$AppDatabase, $UnitConversionsTable> {
+  $$UnitConversionsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get organizationId => $composableBuilder(
+    column: $table.organizationId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get fromUnitId => $composableBuilder(
+    column: $table.fromUnitId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get toUnitId => $composableBuilder(
+    column: $table.toUnitId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<Decimal, Decimal, int> get multiplier =>
+      $composableBuilder(
+        column: $table.multiplier,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$UnitConversionsTableOrderingComposer
+    extends Composer<_$AppDatabase, $UnitConversionsTable> {
+  $$UnitConversionsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get organizationId => $composableBuilder(
+    column: $table.organizationId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get fromUnitId => $composableBuilder(
+    column: $table.fromUnitId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get toUnitId => $composableBuilder(
+    column: $table.toUnitId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get multiplier => $composableBuilder(
+    column: $table.multiplier,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$UnitConversionsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $UnitConversionsTable> {
+  $$UnitConversionsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get organizationId => $composableBuilder(
+    column: $table.organizationId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get fromUnitId => $composableBuilder(
+    column: $table.fromUnitId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get toUnitId =>
+      $composableBuilder(column: $table.toUnitId, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<Decimal, int> get multiplier =>
+      $composableBuilder(
+        column: $table.multiplier,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$UnitConversionsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $UnitConversionsTable,
+          UnitConversion,
+          $$UnitConversionsTableFilterComposer,
+          $$UnitConversionsTableOrderingComposer,
+          $$UnitConversionsTableAnnotationComposer,
+          $$UnitConversionsTableCreateCompanionBuilder,
+          $$UnitConversionsTableUpdateCompanionBuilder,
+          (
+            UnitConversion,
+            BaseReferences<
+              _$AppDatabase,
+              $UnitConversionsTable,
+              UnitConversion
+            >,
+          ),
+          UnitConversion,
+          PrefetchHooks Function()
+        > {
+  $$UnitConversionsTableTableManager(
+    _$AppDatabase db,
+    $UnitConversionsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$UnitConversionsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$UnitConversionsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$UnitConversionsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> organizationId = const Value.absent(),
+                Value<String> fromUnitId = const Value.absent(),
+                Value<String> toUnitId = const Value.absent(),
+                Value<Decimal> multiplier = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => UnitConversionsCompanion(
+                id: id,
+                organizationId: organizationId,
+                fromUnitId: fromUnitId,
+                toUnitId: toUnitId,
+                multiplier: multiplier,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String organizationId,
+                required String fromUnitId,
+                required String toUnitId,
+                required Decimal multiplier,
+                required DateTime createdAt,
+                required DateTime updatedAt,
+                Value<int> rowid = const Value.absent(),
+              }) => UnitConversionsCompanion.insert(
+                id: id,
+                organizationId: organizationId,
+                fromUnitId: fromUnitId,
+                toUnitId: toUnitId,
+                multiplier: multiplier,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$UnitConversionsTable, UnitConversion>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $UnitConversionsTable,
+                    UnitConversion
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$UnitConversionsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $UnitConversionsTable,
+      UnitConversion,
+      $$UnitConversionsTableFilterComposer,
+      $$UnitConversionsTableOrderingComposer,
+      $$UnitConversionsTableAnnotationComposer,
+      $$UnitConversionsTableCreateCompanionBuilder,
+      $$UnitConversionsTableUpdateCompanionBuilder,
+      (
+        UnitConversion,
+        BaseReferences<_$AppDatabase, $UnitConversionsTable, UnitConversion>,
+      ),
+      UnitConversion,
+      PrefetchHooks Function()
+    >;
 typedef $$InventoryLocationsTableCreateCompanionBuilder =
     InventoryLocationsCompanion Function({
       required String id,
@@ -15345,6 +16115,8 @@ class $AppDatabaseManager {
       $$ProductBarcodesTableTableManager(_db, _db.productBarcodes);
   $$ProductPricesTableTableManager get productPrices =>
       $$ProductPricesTableTableManager(_db, _db.productPrices);
+  $$UnitConversionsTableTableManager get unitConversions =>
+      $$UnitConversionsTableTableManager(_db, _db.unitConversions);
   $$InventoryLocationsTableTableManager get inventoryLocations =>
       $$InventoryLocationsTableTableManager(_db, _db.inventoryLocations);
   $$ProductBatchesTableTableManager get productBatches =>

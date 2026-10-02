@@ -57,6 +57,10 @@ class ProductLocalDataSource implements LocalDataSource<ProductSummary> {
 
   @override
   Future<void> upsertAll(TenantScope scope, List<ProductSummary> items) async {
+    if (items.isEmpty) return;
+
+    // Validate the whole batch before writing anything, so a single foreign
+    // row cannot leave a half-applied refresh on disk.
     for (final item in items) {
       // A row claiming another organization is a server-authority violation;
       // refuse rather than writing it under the caller's scope.
@@ -66,27 +70,70 @@ class ProductLocalDataSource implements LocalDataSource<ProductSummary> {
           '${item.organizationId} under $scope',
         );
       }
-      await _db
-          .into(_db.products)
-          .insertOnConflictUpdate(
-            ProductsCompanion.insert(
-              id: item.id,
-              organizationId: item.organizationId,
-              sku: item.sku,
-              name: item.name,
-              status: Value(item.status),
-              categoryId: Value(item.categoryId),
-              brandId: Value(item.brandId),
-              unitId: Value(item.unitId),
-              taxCategoryId: Value(item.taxCategoryId),
-              defaultPurchasePrice: Value(item.defaultPurchasePrice),
-              defaultSellingPrice: Value(item.defaultSellingPrice),
-              reorderLevel: Value(item.reorderLevel),
-              createdAt: DateTime.now().toUtc(),
-              updatedAt: DateTime.now().toUtc(),
-            ),
-          );
     }
+
+    final now = DateTime.now().toUtc();
+
+    await _db.transaction(() async {
+      // Two statements rather than a single insertOnConflictUpdate, because
+      // that helper rewrites every column on conflict and would overwrite
+      // createdAt with a local clock reading. createdAt is server history: a
+      // product created in March must still read as March on this device, not
+      // as whenever the device last happened to sync.
+      //
+      // Insert-only first, so new rows land with their real server values and
+      // existing rows are then updated field by field below.
+      await _db.batch((batch) {
+        batch.insertAll(
+          _db.products,
+          [
+            for (final item in items)
+              ProductsCompanion.insert(
+                id: item.id,
+                organizationId: item.organizationId,
+                sku: item.sku,
+                name: item.name,
+                description: Value(item.description),
+                status: Value(item.status),
+                categoryId: Value(item.categoryId),
+                brandId: Value(item.brandId),
+                unitId: Value(item.unitId),
+                taxCategoryId: Value(item.taxCategoryId),
+                defaultPurchasePrice: Value(item.defaultPurchasePrice),
+                defaultSellingPrice: Value(item.defaultSellingPrice),
+                reorderLevel: Value(item.reorderLevel),
+                reorderQuantity: Value(item.reorderQuantity),
+                createdAt: item.createdAt ?? now,
+                updatedAt: item.updatedAt ?? now,
+              ),
+          ],
+          mode: InsertMode.insertOrIgnore,
+        );
+      });
+
+      // Per-row update so each row keeps its own field values. createdAt is
+      // absent from the companion on purpose: it is not mutable locally.
+      for (final item in items) {
+        await (_db.update(_db.products)..where((p) => p.id.equals(item.id)))
+            .write(
+              ProductsCompanion(
+                sku: Value(item.sku),
+                name: Value(item.name),
+                description: Value(item.description),
+                status: Value(item.status),
+                categoryId: Value(item.categoryId),
+                brandId: Value(item.brandId),
+                unitId: Value(item.unitId),
+                taxCategoryId: Value(item.taxCategoryId),
+                defaultPurchasePrice: Value(item.defaultPurchasePrice),
+                defaultSellingPrice: Value(item.defaultSellingPrice),
+                reorderLevel: Value(item.reorderLevel),
+                reorderQuantity: Value(item.reorderQuantity),
+                updatedAt: Value(item.updatedAt ?? now),
+              ),
+            );
+      }
+    });
   }
 
   static ProductSummary _toDomain(Product row) => ProductSummary(
@@ -94,6 +141,7 @@ class ProductLocalDataSource implements LocalDataSource<ProductSummary> {
     organizationId: row.organizationId,
     sku: row.sku,
     name: row.name,
+    description: row.description,
     status: row.status,
     categoryId: row.categoryId,
     brandId: row.brandId,
@@ -102,5 +150,8 @@ class ProductLocalDataSource implements LocalDataSource<ProductSummary> {
     defaultPurchasePrice: row.defaultPurchasePrice,
     defaultSellingPrice: row.defaultSellingPrice,
     reorderLevel: row.reorderLevel,
+    reorderQuantity: row.reorderQuantity,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   );
 }

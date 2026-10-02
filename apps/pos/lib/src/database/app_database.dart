@@ -200,6 +200,13 @@ class Products extends Table {
 }
 
 /// ProductBarcode table matching backend schema
+///
+/// Indexed on barcode to mirror the backend `@@index([barcode])`. Barcode
+/// lookup is the POS hot path with a sub-100ms target (BRAIN.md Performance
+/// Targets) and is answered from this local index, never from the network
+/// (brain/OFFLINE_SYNC.md Local Authority).
+@TableIndex(name: 'product_barcodes_barcode', columns: {#barcode})
+@TableIndex(name: 'product_barcodes_product', columns: {#productId})
 class ProductBarcodes extends Table {
   TextColumn get id => text()();
   TextColumn get organizationId => text()();
@@ -220,6 +227,18 @@ class ProductBarcodes extends Table {
 }
 
 /// ProductPrice table matching backend schema
+///
+/// Indexed on (productId, priceType, effectiveFrom) to match the backend
+/// `@@index([productId, priceType, effectiveFrom])`. Offline price resolution
+/// reads exactly one window per (product, price type) for an instant, so this
+/// index is what keeps the POS hot path off a full table scan (BRAIN.md
+/// performance targets). Deliberately NOT unique: non-overlap is a server-side
+/// rule (ASM-054) enforced in a write transaction, and a local unique index
+/// could not express a window overlap anyway.
+@TableIndex(
+  name: 'product_prices_product_type_from',
+  columns: {#productId, #priceType, #effectiveFrom},
+)
 class ProductPrices extends Table {
   TextColumn get id => text()();
   TextColumn get productId => text()();
@@ -250,6 +269,36 @@ class InventoryLocations extends Table {
   @override
   List<Set<Column>> get uniqueKeys => [
     {storeId, code},
+  ];
+}
+
+/// UnitConversion table matching backend schema.
+///
+/// Added locally in 05.09 (schemaVersion 2). The backend has had this model
+/// since 05.04, but a POS that cannot convert units offline cannot sell a
+/// product priced per DOZ while its stock is counted in PCS, so the offline
+/// catalog is incomplete without it. Direction is explicit in both rows of a
+/// reciprocal pair and is never derived, matching the server.
+@TableIndex(
+  name: 'unit_conversions_from_to',
+  columns: {#fromUnitId, #toUnitId},
+)
+@TableIndex(name: 'unit_conversions_to_unit', columns: {#toUnitId})
+class UnitConversions extends Table {
+  TextColumn get id => text()();
+  TextColumn get organizationId => text()();
+  TextColumn get fromUnitId => text()();
+  TextColumn get toUnitId => text()();
+  IntColumn get multiplier => integer().map(decimal6)();
+  DateTimeColumn get createdAt => dateTime()();
+  DateTimeColumn get updatedAt => dateTime()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+
+  @override
+  List<Set<Column>> get uniqueKeys => [
+    {organizationId, fromUnitId, toUnitId},
   ];
 }
 
@@ -400,6 +449,7 @@ class SyncOperations extends Table {
     Products,
     ProductBarcodes,
     ProductPrices,
+    UnitConversions,
     InventoryLocations,
     ProductBatches,
     InventoryBalances,
@@ -417,7 +467,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -425,7 +475,24 @@ class AppDatabase extends _$AppDatabase {
       await m.createAll();
     },
     onUpgrade: (Migrator m, int from, int to) async {
-      // Handle migrations here when schema version changes
+      // Version 1 -> 2 (05.09): add unit_conversions, and add the lookup
+      // indexes that offline catalog reads depend on.
+      //
+      // Each step is additive only. Nothing here drops or rewrites a table,
+      // because a POS device may hold unsynced local work and a destructive
+      // migration would silently destroy it.
+      if (from < 2) {
+        await m.createTable(unitConversions);
+        // Drift's createAll does not add indexes to tables that already exist,
+        // so the new indexes are created explicitly. The generated Index
+        // objects are used rather than hand-written SQL, so this list cannot
+        // drift out of step with the @TableIndex annotations above.
+        await m.createIndex(unitConversionsFromTo);
+        await m.createIndex(unitConversionsToUnit);
+        await m.createIndex(productBarcodesBarcode);
+        await m.createIndex(productBarcodesProduct);
+        await m.createIndex(productPricesProductTypeFrom);
+      }
     },
   );
 }

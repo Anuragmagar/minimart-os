@@ -10,6 +10,11 @@ class ProductSummary {
   final String organizationId;
   final String sku;
   final String name;
+
+  /// Carried locally from 05.09. Previously dropped by the data source, so a
+  /// server refresh silently cleared it on every device.
+  final String? description;
+
   final String? categoryId;
   final String? brandId;
   final String? unitId;
@@ -17,7 +22,18 @@ class ProductSummary {
   final Decimal? defaultPurchasePrice;
   final Decimal? defaultSellingPrice;
   final Decimal? reorderLevel;
+
+  /// Carried locally from 05.09. Previously dropped by the data source, so a
+  /// server refresh silently cleared it on every device.
+  final Decimal? reorderQuantity;
+
   final String status;
+
+  /// Server timestamps, carried so a device mirror keeps the server's history
+  /// rather than stamping its own clock on every refresh. Optional because a
+  /// locally constructed summary (tests, fixtures) has no server row behind it.
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   const ProductSummary({
     required this.id,
@@ -25,6 +41,7 @@ class ProductSummary {
     required this.sku,
     required this.name,
     required this.status,
+    this.description,
     this.categoryId,
     this.brandId,
     this.unitId,
@@ -32,6 +49,9 @@ class ProductSummary {
     this.defaultPurchasePrice,
     this.defaultSellingPrice,
     this.reorderLevel,
+    this.reorderQuantity,
+    this.createdAt,
+    this.updatedAt,
   });
 
   /// True when the product is not deactivated.
@@ -48,6 +68,7 @@ class ProductSummary {
       other.organizationId == organizationId &&
       other.sku == sku &&
       other.name == name &&
+      other.description == description &&
       other.categoryId == categoryId &&
       other.brandId == brandId &&
       other.unitId == unitId &&
@@ -55,7 +76,10 @@ class ProductSummary {
       other.defaultPurchasePrice == defaultPurchasePrice &&
       other.defaultSellingPrice == defaultSellingPrice &&
       other.reorderLevel == reorderLevel &&
-      other.status == status;
+      other.reorderQuantity == reorderQuantity &&
+      other.status == status &&
+      other.createdAt == createdAt &&
+      other.updatedAt == updatedAt;
 
   @override
   int get hashCode => Object.hash(
@@ -63,6 +87,7 @@ class ProductSummary {
     organizationId,
     sku,
     name,
+    description,
     categoryId,
     brandId,
     unitId,
@@ -70,7 +95,10 @@ class ProductSummary {
     defaultPurchasePrice,
     defaultSellingPrice,
     reorderLevel,
+    reorderQuantity,
     status,
+    createdAt,
+    updatedAt,
   );
 
   @override

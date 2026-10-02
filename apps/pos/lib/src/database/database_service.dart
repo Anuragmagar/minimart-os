@@ -30,6 +30,9 @@ class DatabaseService {
       await _database.delete(_database.productPrices).go();
       await _database.delete(_database.productBarcodes).go();
       await _database.delete(_database.products).go();
+      // Deleted after products, which reference units, so the order mirrors
+      // the existing child-before-parent pattern.
+      await _database.delete(_database.unitConversions).go();
       await _database.delete(_database.taxCategories).go();
       await _database.delete(_database.units).go();
       await _database.delete(_database.brands).go();
