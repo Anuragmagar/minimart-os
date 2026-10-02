@@ -1,3 +1,5 @@
+import 'package:injectable/injectable.dart';
+
 import 'package:pos/src/data/catalog_entities.dart';
 import 'package:pos/src/data/catalog_local_data_source.dart';
 import 'package:pos/src/data/price_entities.dart';
@@ -58,6 +60,7 @@ class CatalogProduct {
 /// makes local SQLite authoritative for the current device session. Window and
 /// tenant rules live on the domain values and in the data sources, so each rule
 /// is stated once rather than restated per call site.
+@singleton
 class ProductCatalogDataRepository {
   final ProductLocalDataSource _products;
   final CatalogLocalDataSource _catalog;
@@ -318,3 +321,6 @@ int _rescaleHalfAwayFromZero(int value, int fromScale, int toScale) {
   final magnitude = quotient.abs() + (roundAway ? 1 : 0);
   return value.isNegative ? -magnitude : magnitude;
 }
+
+
+

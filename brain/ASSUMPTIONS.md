@@ -593,4 +593,19 @@ Assumption: The following price rules were decided by the user because no brain 
 
 Impact: A price change costs two requests rather than one, and those two requests are not atomic, so a failure between them leaves the product with no price in force until the insert is retried. The overlap rule is advisory at the database level, so the guarantee that a price is unambiguous holds within a transaction but not across two concurrent writers. Nothing requires a product to have any price at all, and the at-least-one-price check before selling has not been implemented, so a product can currently be offered with no price defined. Resolving a price to sell is deliberately not exposed here as a current-price endpoint; the listing accepts `effectiveOn` to answer the same question from the same half-open interval, and choosing a price belongs to the offline catalog and POS tasks (05.10, 08.03).
 
-Status: active - revisit if a price change is ever made atomic through a dedicated endpoint, if a catalog migration adds a PostgreSQL exclusion constraint on overlapping windows for one product and price type, if an authoritative list of Nepal price types is ever sourced, if a minimum price or a per-product minimum count is documented, or if the POS requires resolving a current price server-side.
+## ASM-055
+
+Date: 2026-10-02
+Task: 05.09 - Product Local Database
+Assumption: The Flutter local catalog mirrors the server product structure as follows because no finer business rules were defined in task scope:
+1. Unit conversions are stored as directed rows (fromUnitId -> toUnitId) with explicit multiplier; reciprocals are stored separately and never derived (e.g. PCS->DOZ is a different row). Self-conversions are not synthesized.
+2. Price periods have no organizationId in the local mirror; tenant isolation is enforced by joining through the parent product in read queries, and by validating the parent product's organization when replacing prices. This matches the server schema where product_prices belongs to a product.
+3. Barcodes have no standalone organization check without the product join in lookups; the data source always joins to products to enforce organization membership.
+4. Catalog master data (categories/brands/units/tax categories/unit conversions) is replaced wholesale on refresh (server-wins), deleting rows not returned by the server. This is distinct from LocalDataSource.upsertAll and is not applied to transaction history.
+5. Product createdAt/updatedAt are preserved from server values on refresh; local timestamps are only used when server values are absent. Description and reorderQuantity are persisted locally.
+
+Reason: Implements the documented local authority (brain/OFFLINE_SYNC.md) and the exact half-open window rule from 05.08 without inventing pricing or compliance rules. The decisions mirror the backend schema and ASM-050/ASM-052/ASM-054.
+
+Impact: Synchronization path must treat catalog refresh as replace-by-family; unit conversion reciprocals must be pushed by server if needed. No database constraints added locally beyond existing Drift schema; cross-tenant writes are blocked in the data layer.
+
+Status: active.

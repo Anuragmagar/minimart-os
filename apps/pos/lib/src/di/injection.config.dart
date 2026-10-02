@@ -21,6 +21,9 @@ import '../auth/auth_state.dart' as _i449;
 import '../connectivity/connectivity_module.dart' as _i175;
 import '../connectivity/connectivity_probe.dart' as _i713;
 import '../connectivity/connectivity_service.dart' as _i528;
+import '../data/catalog_local_data_source.dart' as _i1024;
+import '../data/catalog_repository.dart' as _i1044;
+import '../data/product_local_data_source.dart' as _i277;
 import '../database/app_database.dart' as _i982;
 import '../database/database_service.dart' as _i711;
 import '../database/drift_module.dart' as _i74;
@@ -52,6 +55,12 @@ _i174.GetIt $initGetIt(
   gh.lazySingleton<_i528.ConnectivityService>(
     () => connectivityModule.connectivityService(gh<_i713.ConnectivityProbe>()),
   );
+  gh.singleton<_i1024.CatalogLocalDataSource>(
+    () => _i1024.CatalogLocalDataSource(gh<_i982.AppDatabase>()),
+  );
+  gh.singleton<_i277.ProductLocalDataSource>(
+    () => _i277.ProductLocalDataSource(gh<_i982.AppDatabase>()),
+  );
   gh.singleton<_i583.GoRouter>(
     () => routerModule.appRouter(gh<_i449.AuthState>()),
   );
@@ -63,6 +72,12 @@ _i174.GetIt $initGetIt(
   );
   gh.singletonAsync<_i416.ThemeProvider>(
     () => themeModule.themeProvider(gh<_i460.SharedPreferences>()),
+  );
+  gh.singleton<_i1044.ProductCatalogDataRepository>(
+    () => _i1044.ProductCatalogDataRepository(
+      gh<_i277.ProductLocalDataSource>(),
+      gh<_i1024.CatalogLocalDataSource>(),
+    ),
   );
   return getIt;
 }

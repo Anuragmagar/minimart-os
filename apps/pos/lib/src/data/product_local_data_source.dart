@@ -1,13 +1,17 @@
 import 'package:drift/drift.dart';
+import 'package:injectable/injectable.dart';
 
 import 'package:pos/src/database/app_database.dart';
 import 'package:pos/src/data/data_source.dart';
 import 'package:pos/src/data/product_summary.dart';
 import 'package:pos/src/data/tenant_scope.dart';
 
+
 /// Local (SQLite) data source for the product catalog.
 ///
 /// Reference implementation of the [LocalDataSource] convention.
+@singleton
+@singleton
 class ProductLocalDataSource implements LocalDataSource<ProductSummary> {
   final AppDatabase _db;
 
@@ -155,3 +159,5 @@ class ProductLocalDataSource implements LocalDataSource<ProductSummary> {
     updatedAt: row.updatedAt,
   );
 }
+
+

@@ -1,3 +1,5 @@
+import 'package:injectable/injectable.dart';
+
 import 'package:drift/drift.dart';
 
 import 'package:pos/src/data/catalog_entities.dart';
@@ -17,6 +19,7 @@ import 'package:pos/src/database/app_database.dart';
 /// product, exactly as the server does (ASM-054). Filtering on price id alone
 /// would let a caller read another tenant's price by guessing a price id, so
 /// the join is the point of the method rather than an optimization.
+@singleton
 class CatalogLocalDataSource {
   final AppDatabase _db;
 
@@ -665,3 +668,4 @@ class CatalogLocalDataSource {
         effectiveTo: row.effectiveTo,
       );
 }
+

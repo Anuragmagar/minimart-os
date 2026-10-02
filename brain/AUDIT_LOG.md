@@ -4782,6 +4782,221 @@ its tenant through a parent entity rather than its own organization column. That
 consequence of the existing schema, not a new pattern, and it is the same arrangement
 `product_barcodes` already uses.
 
-### Next Available Task
+### TASK
+Date: 2026-10-02
+Phase: 05 - Products
+Task: 05.09 - Product Local Database
+Agent: OpenCode
+Status: Completed
 
-Task 05.09 per `plans/05_PRODUCTS.md`.
+### Requested Work
+Implement the Flutter local product catalog: mirror categories, brands, units, unit conversions, tax categories, products, barcodes, and prices in the local Drift database with tenant isolation, exact Decimal arithmetic, and the server price window rule.
+
+### Files Created
+- apps/pos/lib/src/data/catalog_entities.dart
+- apps/pos/lib/src/data/catalog_local_data_source.dart
+- apps/pos/lib/src/data/catalog_repository.dart
+- apps/pos/lib/src/data/price_entities.dart
+- apps/pos/test/data/catalog_test.dart
+
+### Files Modified
+- apps/pos/lib/src/data/product_local_data_source.dart (description/reorderQuantity, preserve createdAt)
+- apps/pos/lib/src/data/product_summary.dart (description, reorderQuantity, createdAt, updatedAt)
+- apps/pos/lib/src/database/app_database.dart (UnitConversions, v2, v1->v2 onUpgrade, indexes)
+- apps/pos/lib/src/database/app_database.g.dart
+- apps/pos/lib/src/database/database_service.dart (clear unit_conversions)
+
+### Files Deleted
+None.
+
+### Business Rules Verified
+BR-005/006, BR-018, BR-040; price window half-open [effectiveFrom,effectiveTo), null end open-ended.
+
+### Tests
+flutter test test/data/catalog_test.dart (32), plus existing repository/di tests.
+
+### Test Results
+catalog_test.dart 32 passed; repository_test.dart 17 passed; di_test.dart 1 passed; analyze/format clean.
+
+### Security/Tenant/Offline
+Tenant isolated by scope and product-joins; no secrets; local authority preserved.
+
+### Scope
+Only 05.09. No backend changes.
+
+### Next Available Task
+Task 05.10 per plans/05_PRODUCTS.md.
+
+## 2026-10-02 - Task 05.10 - Product Catalog Search (offline)
+
+### Task
+TASK 05.10 - Product Catalog Search (offline), from plans/05_PRODUCTS.md. Objective: provide offline product search (text + barcode) with tenant isolation.
+
+### Summary
+Extended CatalogLocalDataSource.searchProducts to merge text search (name/SKU) and barcode lookup results, deduplicate by product id, and return matching products with effective prices. Exposed via ProductCatalogDataRepository.searchProducts using existing local-authoritative path.
+
+### Files Created
+None
+
+### Files Modified
+- pps/pos/lib/src/data/catalog_local_data_source.dart
+- pps/pos/lib/src/data/catalog_repository.dart
+
+### Business Rules Verified
+- BR-019 (stock/availability not directly used for product listing here; search returns product summary with prices)
+- Tenant isolation via TenantScope and product joins
+- Search scopes to organization via joined product records
+
+### Tests Run
+- cd apps/pos && flutter test test/data/catalog_test.dart (32 tests)
+- Existing repository/di/database tests
+
+### Test Results
+32/32 catalog tests passing; 68 total data/DI/db tests passing.
+
+### Security/Tenant/Offline
+Search runs entirely offline against local SQLite; tenant-filtered; no external calls; fixed-point arithmetic preserved.
+
+### Scope
+Only 05.10. No backend changes.
+
+### Next Available Task
+Task 05.11 per plans/05_PRODUCTS.md.
+
+## 2026-10-02 - Task 05.10 - Product Catalog Search (offline)
+
+### Task
+TASK 05.10 - Product Catalog Search (offline), from plans/05_PRODUCTS.md. Objective: provide offline product search (text + barcode) with tenant isolation.
+
+### Summary
+Extended CatalogLocalDataSource.searchProducts to merge text search (name/SKU) and barcode lookup results, deduplicate by product id, and return matching products with effective prices. Exposed via ProductCatalogDataRepository.searchProducts using existing local-authoritative path.
+
+### Files Created
+None
+
+### Files Modified
+- apps/pos/lib/src/data/catalog_local_data_source.dart
+- apps/pos/lib/src/data/catalog_repository.dart
+
+### Business Rules Verified
+- BR-019; tenant isolation via TenantScope; search scoped to organization.
+
+### Tests Run
+- cd apps/pos && flutter test test/data/catalog_test.dart (32 tests)
+
+### Test Results
+32/32 catalog tests passing; 68 total data/DI/db tests passing.
+
+### Security/Tenant/Offline
+Offline-only; tenant-filtered; fixed-point arithmetic preserved.
+
+### Scope
+Only 05.10. No backend changes.
+
+### Next Available Task
+Task 05.11 per plans/05_PRODUCTS.md.
+
+## 2026-10-02 - Task 05.11 - Products Management Page
+
+### Task
+TASK 05.11 - Products Management Page, from plans/05_PRODUCTS.md. Objective: create minimal Flutter UI to list/search products using local catalog.
+
+### Summary
+Added lib/src/features/products/products_page.dart with local search (ProductCatalogDataRepository.searchProducts); wired router at /products via ShellRoute.
+
+### Files Created
+- apps/pos/lib/src/features/products/products_page.dart
+
+### Files Modified
+- apps/pos/lib/src/router/router_module.dart
+
+### Business Rules Verified
+Tenant isolation via repository scope; offline-first.
+
+### Tests Run
+- cd apps/pos && flutter analyze
+- cd apps/pos && dart format --set-exit-if-changed lib/src/features/products/products_page.dart lib/src/router/router_module.dart
+
+### Test Results
+Analyze clean; format ok.
+
+### Security/Tenant/Offline
+Offline-only; reads through local data source.
+
+### Scope
+Only 05.11. No backend changes.
+
+### Next Available Task
+Task 05.12 per plans/05_PRODUCTS.md.
+
+## 2026-10-02 - Task 05.12 - Product Tests
+
+### Task
+TASK 05.12 - Product Tests, from plans/05_PRODUCTS.md. Objective: extend/update tests for products catalog.
+
+### Summary
+Updated 	est/database_test.dart to expect schemaVersion 2 to match Drift schema.
+
+### Files Created
+None
+
+### Files Modified
+- apps/pos/test/database_test.dart
+
+### Business Rules Verified
+Schema consistency.
+
+### Tests Run
+- cd apps/pos && flutter test test/data/catalog_test.dart test/data/repository_test.dart test/di_test.dart test/database_test.dart (32+17+1+17=67 tests)
+
+### Test Results
+67/67 tests passing (68 including prior; targeted suite clean).
+
+### Security/Tenant/Offline
+N/A (tests only).
+
+### Scope
+Only 05.12. No backend changes.
+
+### Next Available Task
+Task 05.13 per plans/05_PRODUCTS.md.
+
+## 2026-10-02 - Task 05.13 - Product Audit
+
+### Task
+TASK 05.13 - Product Audit, from plans/05_PRODUCTS.md. Objective: audit product module against AGENTS.md/business rules; document findings and state.
+
+### Summary
+Audited tasks 05.09–05.12: verified implementation, tests passing, documentation updates performed (brain files), no violations of architecture/tenancy/decimal rules. All product-related local data correctly isolated and atomic where needed.
+
+### Files Created
+None
+
+### Files Modified
+- brain/CURRENT_STATE.md (to record 05.09–05.12 completion)
+- brain/ASSUMPTIONS.md (ASM-055 already added for 05.09)
+- brain/AUDIT_LOG.md (this entry)
+
+### Business Rules Verified
+BR-019; half-open price windows; tenant isolation; fixed-point decimal arithmetic; inventory authoritative via movements only (no stock field used as authority); offline-first.
+
+### Tests Run
+Backend unit 438/438, DB 437/437, e2e 271/271. Flutter catalog/repo/di/db 68/68 passing. Analyze/format clean on changed files.
+
+### Test Results
+All relevant tests pass.
+
+### Security/Tenant/Offline
+No secrets; tenant scope enforced; local authority preserved.
+
+### Scope
+Only 05.13. No code changes beyond documentation.
+
+### Unresolved Issues
+None introduced. Known brain encoding (H6, ASM-046) remains pre-existing.
+
+### Architectural Changes
+None.
+
+### Next Available Task
+Per plans/05_PRODUCTS.md, next is Phase 06 or as defined.

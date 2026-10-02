@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  Inject,
 } from '@nestjs/common';
 import { PrismaService, type PrismaTx } from '../database/prisma.service.js';
 import { AuditService } from '../audit/audit.service.js';
@@ -33,6 +34,7 @@ type StoredPeriod = {
 @Injectable()
 export class PriceService {
   constructor(
+    @Inject(PriceRepository)
     private readonly priceRepository: PriceRepository,
     private readonly productRepository: ProductRepository,
     private readonly prisma: PrismaService,
