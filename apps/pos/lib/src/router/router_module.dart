@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:injectable/injectable.dart';
 
-import '../auth/auth_state.dart';
 import '../auth/login_page.dart';
+import '../auth/auth_state.dart';
 import '../features/home/home_page.dart';
+import '../features/products/products_page.dart';
 import '../shell/app_shell.dart';
 
 @module
@@ -22,8 +23,7 @@ abstract class RouterModule {
           GoRoute(path: '/pos', builder: (context, state) => const HomePage()),
           GoRoute(
             path: '/products',
-            builder: (context, state) =>
-                const PlaceholderPage(title: 'Products'),
+            builder: (context, state) => const ProductsPage(),
           ),
           GoRoute(
             path: '/sales',
