@@ -183,6 +183,12 @@ class ProductCatalogDataRepository {
     String productId,
   ) => _catalog.findBarcodesForProduct(scope, productId);
 
+  /// Local name/SKU/barcode search across products in [scope].
+  Future<List<ProductSummary>> searchProducts(
+    TenantScope scope,
+    String query,
+  ) => _catalog.searchProducts(scope, query);
+
   // ----------------------------------------------------------------- prices
 
   /// Every price period held for a product, across all price types.
