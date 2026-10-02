@@ -63,7 +63,7 @@ void main() {
     });
 
     test('reports the current schema version', () {
-      expect(db.schemaVersion, 1);
+      expect(db.schemaVersion, 2);
     });
   });
 
